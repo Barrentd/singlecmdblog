@@ -174,8 +174,16 @@ NAV_JS = (
 "else{initTheme();initMenu();}})();"
 )
 
-def build_nav(site_title:str, base_url:str, categories_sorted:list[tuple[str,str]], has_about:bool)->str:
-    links = f'<a class="navlink" href="{base_url}index.html">Home</a>' + (f'<a class="navlink" href="{base_url}about.html">About</a>' if has_about else "")
+def build_nav(site_title:str, base_url:str, categories_sorted:list[tuple[str,str]], pages:dict)->str:
+    # Construire les liens de navigation pour toutes les pages
+    nav_links = [f'<a class="navlink" href="{base_url}index.html">Home</a>']
+    
+    # Ajouter toutes les pages au menu (triées par titre)
+    for slug, page_data in sorted(pages.items(), key=lambda x: x[1]["title"]):
+        nav_links.append(f'<a class="navlink" href="{base_url}{slug}.html">{html.escape(page_data["title"])}</a>')
+    
+    links = "".join(nav_links)
+    
     if categories_sorted:
         opts="".join(f'<option value="{base_url}category/{s}.html">{html.escape(n)}</option>' for n,s in categories_sorted)
         select=(f'<select id="categorySelect" class="catselect" aria-label="Categories">'
@@ -224,9 +232,10 @@ def collect_entries(content_dir:Path):
         raw=f.read_text(encoding="utf-8").strip()
         meta, body = parse_front_matter(raw)
         title = meta.get("title") or (body.splitlines()[0].lstrip("# ").strip() if body else f.stem) or f.stem
-        subtitle = meta.get("subtitle", "")  # Support pour les sous-titres
+        subtitle = meta.get("subtitle", "")
         page_kind=(meta.get("page") or "").lower()
-        is_page = page_kind in ("about","page") or f.stem.lower()=="about"
+        # Modifié : accepter toute valeur truthy pour "page"
+        is_page = page_kind in ("about","page","true") or str(meta.get("page","")).lower() in ("true","1","yes") or f.stem.lower()=="about"
         date_obj = parse_date(meta.get("date","")) or dt.datetime.fromtimestamp(f.stat().st_mtime)
         date_str = date_obj.strftime("%Y-%m-%d")
         cats = meta.get("categories") or []
@@ -330,7 +339,8 @@ def build(args):
                 cat_map.setdefault(slug,(name,[]))[1].append(p)
     categories_sorted=sorted([(v[0],k) for k,v in cat_map.items()], key=lambda x:x[0].lower())
 
-    nav_html=build_nav(site.get("title","TinyBlog"), args.base_url, categories_sorted, has_about=("about" in pages))
+    # Modifié : passer les pages au lieu de has_about
+    nav_html=build_nav(site.get("title","TinyBlog"), args.base_url, categories_sorted, pages)
 
     rendered={}
 
@@ -338,10 +348,9 @@ def build(args):
     idx_body=build_ordered_list(posts, args.base_url)
     rendered["/index.html"]=minify_html(render_page("Home", idx_body, site.get("title","TinyBlog"), args.base_url, pal_css, nav_html))
 
-    # about
-    if "about" in pages:
-        p=pages["about"]
-        rendered["/about.html"]=minify_html(render_page("About", md_render(p["md"]), site.get("title","TinyBlog"), args.base_url, pal_css, nav_html))
+    # Modifié : générer toutes les pages au lieu de seulement "about"
+    for slug, page_data in pages.items():
+        rendered[f"/{slug}.html"]=minify_html(render_page(page_data["title"], md_render(page_data["md"]), site.get("title","TinyBlog"), args.base_url, pal_css, nav_html))
 
     # posts
     for p in posts:
@@ -354,7 +363,7 @@ def build(args):
     # categories
     for slug,(name,plist) in cat_map.items():
         plist_sorted=sorted(plist,key=lambda p:p["date_obj"],reverse=True)
-        body=f"<h2>Category: {html.escape(name)}</h2>"+build_ordered_list(plist_sorted, args.base_url)
+        body=build_ordered_list(plist_sorted, args.base_url)
         rendered[f"/category/{slug}.html"]=minify_html(render_page(f"Category · {name}", body, site.get("title","TinyBlog"), args.base_url, pal_css, nav_html))
 
     if args.serve:
