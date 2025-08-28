@@ -1,0 +1,21 @@
+{
+  "title": "My Blog devops",
+  "palette": {
+    "bg": "#fffdf7",
+    "fg": "#18181b",
+    "muted": "#6b7280",
+    "link": "#0ea5e9",
+    "accent": "#22c55e",
+    "card": "#ffffff",
+    "cardBorder": "#e5e7eb"
+  },
+  "paletteDark": {
+    "bg": "#0b0b0c",
+    "fg": "#e7e7ea",
+    "muted": "#9aa0a6",
+    "link": "#8ab4f8",
+    "accent": "#60a5fa",
+    "card": "#0f172a",
+    "cardBorder": "#1f2937"
+  }
+}
