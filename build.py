@@ -94,10 +94,10 @@ def parse_date(s:str)->dt.datetime|None:
 
 # ===================== Template / CSS / JS / minify =====================
 BASE_CSS = (
-":root{--bg:#fff;--fg:#111;--muted:#666;--link:#0a6cff;--accent:#3b82f6;--card:#f8fafc;--card-border:#e5e7eb}"
+":root{--bg:#f8f9fa;--fg:#2d3748;--muted:#718096;--link:#3182ce;--accent:#4299e1;--card:#f1f3f4;--card-border:#d1d5db}"
 "@media(prefers-color-scheme:dark){:root{--bg:#0b0b0c;--fg:#eaeaea;--muted:#9aa0a6;--link:#8ab4f8;--accent:#60a5fa;--card:#0f172a;--card-border:#1f2937}}"
 "/* explicit overrides when toggled */"
-"html[data-theme=light]{--bg:#fff;--fg:#111;--muted:#666;--link:#0a6cff;--accent:#3b82f6;--card:#f8fafc;--card-border:#e5e7eb}"
+"html[data-theme=light]{--bg:#f8f9fa;--fg:#2d3748;--muted:#718096;--link:#3182ce;--accent:#4299e1;--card:#f1f3f4;--card-border:#d1d5db}"
 "html[data-theme=dark]{--bg:#0b0b0c;--fg:#eaeaea;--muted:#9aa0a6;--link:#8ab4f8;--accent:#60a5fa;--card:#0f172a;--card-border:#1f2937}"
 "*,*:before,*:after{box-sizing:border-box}"
 "/* smooth theme transitions */"
@@ -110,8 +110,13 @@ BASE_CSS = (
 "h2{font-size:clamp(18px,3.7vw,24px);line-height:1.2;margin:14px 0 8px}"
 "p{margin:10px 0}a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}"
 "code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}"
-"pre{overflow:auto;padding:10px;border:1px solid var(--card-border);border-radius:8px;background:var(--card)}"
-"code{padding:1px 3px;border:1px solid var(--card-border);border-radius:3px;background:rgba(127,127,127,.08)}"
+"/* Responsive code blocks with proper line handling */"
+"pre{overflow-x:auto;overflow-y:hidden;padding:12px 16px;border:1px solid var(--card-border);border-radius:8px;background:var(--card);max-width:100%;white-space:pre;line-height:1.5;font-size:14px;tab-size:2}"
+"pre code{padding:0;border:none;background:transparent;white-space:pre;display:block;overflow-wrap:normal;word-wrap:normal}"
+"code{padding:2px 4px;border:1px solid var(--card-border);border-radius:4px;background:rgba(127,127,127,.08);font-size:0.9em;white-space:pre-wrap;word-wrap:break-word}"
+"/* Better mobile handling for code blocks */"
+"@media(max-width:768px){pre{font-size:13px;padding:10px 12px;margin:8px -3vw;border-radius:0;border-left:none;border-right:none;line-height:1.4}code{font-size:0.85em}}"
+"@media(max-width:480px){pre{font-size:12px;padding:8px 10px;line-height:1.3}}"
 "img{max-width:100%;height:auto;border-radius:6px}"
 "table{width:100%;border-collapse:collapse;display:block;overflow-x:auto}"
 "th,td{border:1px solid var(--card-border);padding:.4rem .5rem;text-align:left;vertical-align:top}"
