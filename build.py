@@ -36,7 +36,7 @@ def _markdown_engine():
             if importlib.util.find_spec(name): exts.append(name)
         md = markdown.Markdown(extensions=exts, extension_configs={
             "pymdownx.tasklist":{"custom_checkbox":True,"clickable_checkbox":False},
-            "codehilite":{"guess_lang":False,"noclasses":False},
+            "codehilite":{"guess_lang":True,"noclasses":True,"use_pygments":False,"css_class":"codehilite","linenums":False},
         })
         return lambda text: md.reset().convert(text)
     # fallback mini parser
@@ -94,12 +94,14 @@ def parse_date(s:str)->dt.datetime|None:
 
 # ===================== Template / CSS / JS / minify =====================
 BASE_CSS = (
-":root{--bg:#f0f8ff;--fg:#2d3748;--muted:#718096;--link:#3182ce;--accent:#4299e1;--card:#f1f3f4;--card-border:#d1d5db}"
+":root{--bg:#f7f7f7;--fg:#2d3748;--muted:#718096;--link:#3182ce;--accent:#4299e1;--card:#f1f3f4;--card-border:#d1d5db}"
 "@media(prefers-color-scheme:dark){:root{--bg:#0b0b0c;--fg:#eaeaea;--muted:#9aa0a6;--link:#8ab4f8;--accent:#60a5fa;--card:#0f172a;--card-border:#1f2937}}"
 "/* explicit overrides when toggled */"
-"html[data-theme=light]{--bg:#f0f8ff;--fg:#2d3748;--muted:#718096;--link:#3182ce;--accent:#4299e1;--card:#f1f3f4;--card-border:#d1d5db}"
+"html[data-theme=light]{--bg:#f7f7f7;--fg:#2d3748;--muted:#718096;--link:#3182ce;--accent:#4299e1;--card:#f1f3f4;--card-border:#d1d5db}"
 "html[data-theme=dark]{--bg:#0b0b0c;--fg:#eaeaea;--muted:#9aa0a6;--link:#8ab4f8;--accent:#60a5fa;--card:#0f172a;--card-border:#1f2937}"
 "*,*:before,*:after{box-sizing:border-box}"
+"/* disable transitions during first paint */"
+"html[data-tb-init],html[data-tb-init] *{transition:none!important}"
 "/* smooth theme transitions */"
 "html{transition:background-color 0.3s ease,color 0.3s ease}"
 "body,main,pre,code,.postcard,.navbar,.btn,.catselect,.chip{transition:background-color 0.3s ease,color 0.3s ease,border-color 0.3s ease}"
@@ -110,13 +112,20 @@ BASE_CSS = (
 "h2{font-size:clamp(18px,3.7vw,24px);line-height:1.2;margin:14px 0 8px}"
 "p{margin:10px 0}a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}"
 "code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}"
-"/* Responsive code blocks with proper line handling */"
-"pre{overflow-x:auto;overflow-y:hidden;padding:12px 16px;border:1px solid var(--card-border);border-radius:8px;background:var(--card);max-width:100%;white-space:pre;line-height:1.5;font-size:14px;tab-size:2}"
-"pre code{padding:0;border:none;background:transparent;white-space:pre;display:block;overflow-wrap:normal;word-wrap:normal}"
-"code{padding:2px 4px;border:1px solid var(--card-border);border-radius:4px;background:rgba(127,127,127,.08);font-size:0.9em;white-space:pre-wrap;word-wrap:break-word}"
-"/* Better mobile handling for code blocks */"
-"@media(max-width:768px){pre{font-size:13px;padding:10px 12px;margin:8px -3vw;border-radius:0;border-left:none;border-right:none;line-height:1.4}code{font-size:0.85em}}"
-"@media(max-width:480px){pre{font-size:12px;padding:8px 10px;line-height:1.3}}"
+"/* Enhanced code blocks with Highlight.js support */"
+"pre{display:block;overflow:auto;padding:16px;border:1px solid var(--card-border);border-radius:8px;background:var(--card);width:100%;max-width:100%;white-space:pre;line-height:1.4;font-size:14px;tab-size:2;box-sizing:border-box;max-height:75vh;scrollbar-width:thin}"
+"pre::-webkit-scrollbar{width:8px;height:8px}"
+"pre::-webkit-scrollbar-track{background:transparent}"
+"pre::-webkit-scrollbar-thumb{background:var(--card-border);border-radius:4px}"
+"pre::-webkit-scrollbar-thumb:hover{background:var(--muted)}"
+"pre code{display:block;padding:0;border:none;background:transparent;white-space:pre;font-size:inherit;line-height:inherit;width:100%;box-sizing:border-box}"
+"/* Override Highlight.js theme for consistency */"
+"pre code.hljs{background:var(--card)!important;color:var(--fg)!important;padding:0!important}"
+"/* Inline code - no line breaks */"
+"code:not(pre code){padding:3px 6px;border:1px solid var(--card-border);border-radius:4px;background:rgba(127,127,127,.08);font-size:0.9em;white-space:nowrap;word-wrap:normal;overflow-wrap:normal}"
+"/* Better mobile handling */"
+"@media(max-width:768px){pre{font-size:13px;padding:12px;margin:12px -3vw;border-radius:0;border-left:none;border-right:none;line-height:1.3;max-height:60vh}code:not(pre code){font-size:0.85em;padding:2px 4px}}"
+"@media(max-width:480px){pre{font-size:12px;padding:10px;line-height:1.25;max-height:50vh}code:not(pre code){font-size:0.8em}}"
 "img{max-width:100%;height:auto;border-radius:6px}"
 "table{width:100%;border-collapse:collapse;display:block;overflow-x:auto}"
 "th,td{border:1px solid var(--card-border);padding:.4rem .5rem;text-align:left;vertical-align:top}"
@@ -166,17 +175,29 @@ def palette_override(light:dict|None, dark:dict|None)->str:
     if dark:  css+=css_from("html[data-theme=dark]",  dark)
     return css
 
+# Early theme boot to avoid initial fade
+THEME_BOOT_JS = (
+"(function(){var d=document,rt=d.documentElement;"
+"rt.setAttribute('data-tb-init','1');"
+"var t=null;try{t=localStorage.getItem('tb-theme')}catch(e){}"
+"if(!t){t=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'}"
+"rt.dataset.theme=t;"
+"})();"
+)
+
+# Updated nav/menu/theme script (no re-apply on load)
 NAV_JS = (
 "(function(){const d=document,rt=d.documentElement;const KEY='tb-theme';"
 "function apply(t){rt.dataset.theme=t;try{localStorage.setItem(KEY,t)}catch(e){}}"
-"function initTheme(){let t=(()=>{try{return localStorage.getItem(KEY)}catch(e){return null}})();"
-"if(!t){t=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'}apply(t);"
+"function initUI(){"
 "var b=d.getElementById('themeToggle');if(b){b.textContent=(rt.dataset.theme==='dark'?'☀️':'🌙');"
-"b.onclick=function(){var v=(rt.dataset.theme==='dark'?'light':'dark');apply(v);b.textContent=(v==='dark'?'☀️':'🌙');}}}"
-"function initMenu(){var m=d.getElementById('menuToggle');if(m){m.onclick=function(){rt.classList.toggle('menu-open');}}"
-"var sel=d.getElementById('categorySelect');if(sel){sel.onchange=function(){if(sel.value)location.href=sel.value;}}}"
-"if(d.readyState==='loading'){d.addEventListener('DOMContentLoaded',function(){initTheme();initMenu();});}"
-"else{initTheme();initMenu();}})();"
+"b.onclick=function(){var v=(rt.dataset.theme==='dark'?'light':'dark');apply(v);b.textContent=(v==='dark'?'☀️':'🌙');}}"
+"var m=d.getElementById('menuToggle');if(m){m.onclick=function(){rt.classList.toggle('menu-open');}}"
+"var sel=d.getElementById('categorySelect');if(sel){sel.onchange=function(){if(sel.value)location.href=sel.value;}}"
+"requestAnimationFrame(function(){rt.removeAttribute('data-tb-init');});"
+"}"
+"if(d.readyState==='loading'){d.addEventListener('DOMContentLoaded',initUI);}else{initUI();}"
+"})();"
 )
 
 def build_nav(site_title:str, base_url:str, categories_sorted:list[tuple[str,str]], pages:dict)->str:
@@ -211,9 +232,12 @@ def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, pale
             "<link rel=preconnect href=https://fonts.googleapis.com>"
             "<link rel=preconnect href=https://fonts.gstatic.com crossorigin>"
             "<link href='https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Geist:wght@100..900&family=Ubuntu+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap' rel=stylesheet>"
+            f"<script>{THEME_BOOT_JS}</script>"
             f"<style>{BASE_CSS}{palette_css}</style>"
             f"{nav_html}<main><header><h1>{html.escape(doc_title)}</h1></header>"
             f"{body_html}<footer></footer></main>"
+            "<script src=https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js></script>"
+            "<script>hljs.highlightAll();</script>"
             f"<script>{NAV_JS}</script>")
 
 def minify_html(s:str)->str:
