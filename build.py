@@ -30,41 +30,80 @@ def parse_args():
 def _markdown_engine():
     if importlib.util.find_spec("markdown"):
         import markdown  # type: ignore
-        exts = ["extra","sane_lists","smarty","toc","codehilite"]
+        # Pas de codehilite/pymdownx.highlight -> laisser HLJS faire la coloration
+        exts = ["extra","sane_lists","smarty","toc"]
         for name in ("pymdownx.tasklist","pymdownx.tilde","pymdownx.caret","pymdownx.emoji",
-                     "pymdownx.superfences","pymdownx.highlight"):
+                     "pymdownx.superfences"):
             if importlib.util.find_spec(name): exts.append(name)
         md = markdown.Markdown(extensions=exts, extension_configs={
             "pymdownx.tasklist":{"custom_checkbox":True,"clickable_checkbox":False},
-            "codehilite":{"guess_lang":True,"noclasses":True,"use_pygments":False,"css_class":"codehilite","linenums":False},
         })
         return lambda text: md.reset().convert(text)
-    # fallback mini parser
-    RX = [
-        (re.compile(r"\*\*(.+?)\*\*"), r"<b>\1</b>"),
-        (re.compile(r"\*(.+?)\*"), r"<i>\1</i>"),
-        (re.compile(r"`(.+?)`"), lambda m: f"<code>{html.escape(m.group(1))}</code>"),
-        (re.compile(r"!\[([^\]]*)\]\(([^)]+)\)"), r'<img alt="\1" src="\2">'),
-        (re.compile(r"\[([^\]]+)\]\(([^)]+)\)"), r'<a href="\2">\1</a>'),
-    ]
+
+    # fallback mini parser: titres, hr, paragraphes, inline, fenced code ```
     def _mini(text:str)->str:
-        lines=text.strip().splitlines(); out=[]; buf=[]
-        def flush():
-            if buf:
-                t=" ".join(buf).strip()
-                if t: out.append(f"<p>{t}</p>")
-                buf.clear()
+        lines=text.splitlines()
+        out:list[str]=[]
+        buf:list[str]=[]
+        in_code=False
+        code_lang=""
+        code_buf:list[str]=[]
+
+        def flush_p():
+            nonlocal buf
+            if not buf: return
+            t=" ".join(buf).strip()
+            if t:
+                # t est déjà échappé (voir plus bas)
+                t=re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t)
+                t=re.sub(r"\*(.+?)\*", r"<i>\1</i>", t)
+                # ne pas ré-échapper à l'intérieur
+                t=re.sub(r"`(.+?)`", r"<code>\1</code>", t)
+                t=re.sub(r"!\[([^\]]*)\]\(([^)]+)\)", r'<img alt="\1" src="\2">', t)
+                t=re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', t)
+                out.append(f"<p>{t}</p>")
+            buf=[]
+
         for raw in lines:
-            l=raw.rstrip()
-            if not l: flush(); continue
-            if l.startswith("# "): flush(); out.append(f"<h1>{html.escape(l[2:].strip())}</h1>"); continue
-            if l.startswith("## "): flush(); out.append(f"<h2>{html.escape(l[3:].strip())}</h2>"); continue
-            if l.strip()=="---": flush(); out.append("<hr>"); continue
+            l=raw.rstrip("\n")
+            ls=l.strip()
+
+            if in_code:
+                if ls.startswith("```"):
+                    code_html=html.escape("\n".join(code_buf))
+                    cls=f' class="language-{code_lang}"' if code_lang else ""
+                    out.append(f"<pre><code{cls}>{code_html}</code></pre>")
+                    in_code=False; code_lang=""; code_buf=[]
+                else:
+                    code_buf.append(l)
+                continue
+
+            if ls.startswith("```"):
+                flush_p()
+                code_lang=ls[3:].strip().lower()
+                in_code=True; code_buf=[]
+                continue
+
+            if not ls:
+                flush_p(); continue
+
+            if l.startswith("# "):
+                flush_p(); out.append(f"<h1>{html.escape(l[2:].strip())}</h1>"); continue
+            if l.startswith("## "):
+                flush_p(); out.append(f"<h2>{html.escape(l[3:].strip())}</h2>"); continue
+            if ls=="---":
+                flush_p(); out.append("<hr>"); continue
+
+            # stocker déjà échappé pour éviter toute injection
             buf.append(html.escape(l))
-        flush()
-        s="".join(out)
-        for rx,repl in RX: s=rx.sub(repl,s)
-        return s
+
+        flush_p()
+        if in_code:
+            code_html=html.escape("\n".join(code_buf))
+            cls=f' class="language-{code_lang}"' if code_lang else ""
+            out.append(f"<pre><code{cls}>{code_html}</code></pre>")
+        return "".join(out)
+
     return _mini
 
 md_render=_markdown_engine()
@@ -118,7 +157,13 @@ BASE_CSS = (
 "pre::-webkit-scrollbar-track{background:transparent}"
 "pre::-webkit-scrollbar-thumb{background:var(--card-border);border-radius:4px}"
 "pre::-webkit-scrollbar-thumb:hover{background:var(--muted)}"
-"pre code{display:block;padding:0;border:none;background:transparent;white-space:pre;font-size:inherit;line-height:inherit;width:100%;box-sizing:border-box}"
+"pre code{white-space:pre!important}"  # préserve les espaces dans le code
+".markdown-code-block .line{display:block;white-space:pre}"  # chaque ligne = bloc, conserve indentation
+"/* GitLab-like wrapper and copy button */"
+".markdown-code-block{position:relative}"
+"copy-code{position:absolute;top:6px;right:6px}"
+"copy-code .btn{padding:.25rem .5rem;font-size:.8rem}"
+".line{display:block;white-space:pre}"  # préserver indentation et retours
 "/* Override Highlight.js theme for consistency */"
 "pre code.hljs{background:var(--card)!important;color:var(--fg)!important;padding:0!important}"
 "/* Inline code - no line breaks */"
@@ -175,26 +220,80 @@ def palette_override(light:dict|None, dark:dict|None)->str:
     if dark:  css+=css_from("html[data-theme=dark]",  dark)
     return css
 
-# Early theme boot to avoid initial fade
+# Early theme boot to avoid initial fade (set theme + charger thème HLJS sans flash)
 THEME_BOOT_JS = (
 "(function(){var d=document,rt=d.documentElement;"
 "rt.setAttribute('data-tb-init','1');"
 "var t=null;try{t=localStorage.getItem('tb-theme')}catch(e){}"
 "if(!t){t=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'}"
 "rt.dataset.theme=t;"
+"var ln=d.createElement('link');ln.id='hljs-theme';ln.rel='stylesheet';"
+"ln.href=(t==='dark'"
+"? 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css'"
+": 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github.min.css');"
+"d.head.appendChild(ln);"
 "})();"
 )
 
-# Updated nav/menu/theme script (no re-apply on load)
+# Updated nav/menu/theme script (toggle + switch de thème HLJS + GitLab-like code blocks)
 NAV_JS = (
 "(function(){const d=document,rt=d.documentElement;const KEY='tb-theme';"
-"function apply(t){rt.dataset.theme=t;try{localStorage.setItem(KEY,t)}catch(e){}}"
+"function setHLJSTheme(t){var ln=d.getElementById('hljs-theme');"
+"if(!ln){ln=d.createElement('link');ln.id='hljs-theme';ln.rel='stylesheet';d.head.appendChild(ln);} "
+"ln.href=(t==='dark'"
+"? 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css'"
+": 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github.min.css');}"
+"function apply(t){rt.dataset.theme=t;setHLJSTheme(t);try{localStorage.setItem(KEY,t)}catch(e){}}"
+"function enhanceCode(){"
+" var idx=1;"
+" d.querySelectorAll('pre>code').forEach(function(code){"
+"   var pre=code.parentElement;if(pre.dataset.glified==='1')return;pre.dataset.glified='1';"
+"   var lang='';code.classList.forEach(function(c){if(c.indexOf('language-')===0){lang=c.slice(9);}});"
+"   if(!lang){lang=(code.getAttribute('data-lang')||'').toLowerCase();}"
+"   pre.setAttribute('data-canonical-lang',lang||'');"
+"   pre.classList.add('code','highlight','js-syntax-highlight');"
+"   if(lang){pre.classList.add('language-'+lang);}"
+"   if(!pre.id){pre.id='code-'+(idx++);}"
+"   var raw=(code.textContent||'').replace(/\\r\\n?/g,'\\n');"
+"   function esc(s){return s.replace(/[&<>]/g,function(ch){return ch==='&'?'&amp;':(ch==='<'?'&lt;':'&gt;')});}"
+"   var html=esc(raw);"
+"   if(window.hljs){"
+"     try{"
+"       if(lang && hljs.getLanguage && hljs.getLanguage(lang)){"
+"         html=hljs.highlight(raw,{language:lang}).value;"
+"       }else if(hljs.highlightAuto){"
+"         var r=hljs.highlightAuto(raw);html=r.value;}"
+"     }catch(e){}"
+"   }"
+"   var parts=html.split('\\n');"
+"   for(var i=0;i<parts.length;i++){"
+"     parts[i]='<span lang=\"'+(lang||'plaintext')+'\" class=\"line\" id=\"LC'+(i+1)+'\">'+parts[i]+'</span>';"
+"   }"
+"   code.innerHTML=parts.join('\\n');"
+"   var wrap=d.createElement('div');wrap.className='gl-relative markdown-code-block js-markdown-code';"
+"   pre.parentNode.insertBefore(wrap,pre);wrap.appendChild(pre);"
+"   var cpy=d.createElement('copy-code');"
+"   var btn=d.createElement('button');btn.type='button';btn.className='btn btn-sm';"
+"   btn.setAttribute('aria-label','Copy to clipboard');btn.title='Copy to clipboard';btn.textContent='Copy';"
+"   btn.addEventListener('click',function(){"
+"     var txt=raw;"
+"     if(navigator.clipboard&&navigator.clipboard.writeText){"
+"       navigator.clipboard.writeText(txt).then(function(){btn.textContent='Copied';setTimeout(function(){btn.textContent='Copy';},1200);});"
+"     }else{"
+"       var ta=d.createElement('textarea');ta.value=txt;d.body.appendChild(ta);ta.select();try{d.execCommand('copy');}finally{d.body.removeChild(ta);}btn.textContent='Copied';setTimeout(function(){btn.textContent='Copy';},1200);"
+"     }"
+"   });"
+"   cpy.appendChild(btn);wrap.appendChild(cpy);"
+" });"
+"}"
 "function initUI(){"
-"var b=d.getElementById('themeToggle');if(b){b.textContent=(rt.dataset.theme==='dark'?'☀️':'🌙');"
-"b.onclick=function(){var v=(rt.dataset.theme==='dark'?'light':'dark');apply(v);b.textContent=(v==='dark'?'☀️':'🌙');}}"
-"var m=d.getElementById('menuToggle');if(m){m.onclick=function(){rt.classList.toggle('menu-open');}}"
-"var sel=d.getElementById('categorySelect');if(sel){sel.onchange=function(){if(sel.value)location.href=sel.value;}}"
-"requestAnimationFrame(function(){rt.removeAttribute('data-tb-init');});"
+" setHLJSTheme(rt.dataset.theme||'light');"
+" var b=d.getElementById('themeToggle');if(b){b.textContent=(rt.dataset.theme==='dark'?'☀️':'🌙');"
+" b.onclick=function(){var v=(rt.dataset.theme==='dark'?'light':'dark');apply(v);b.textContent=(v==='dark'?'☀️':'🌙');}}"
+" var m=d.getElementById('menuToggle');if(m){m.onclick=function(){rt.classList.toggle('menu-open');}}"
+" var sel=d.getElementById('categorySelect');if(sel){sel.onchange=function(){if(sel.value)location.href=sel.value;}}"
+" enhanceCode();"
+" requestAnimationFrame(function(){rt.removeAttribute('data-tb-init');});"
 "}"
 "if(d.readyState==='loading'){d.addEventListener('DOMContentLoaded',initUI);}else{initUI();}"
 "})();"
@@ -241,7 +340,19 @@ def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, pale
             f"<script>{NAV_JS}</script>")
 
 def minify_html(s:str)->str:
-    s=re.sub(r">\s+<","><",s); s=re.sub(r"\s{2,}"," ",s); return s.strip()
+    # Protéger le contenu sensible aux espaces
+    keep:list[str]=[]
+    def stash(m):
+        keep.append(m.group(0))
+        return f"<!--__TB_KEEP_{len(keep)-1}__-->"
+    # préserve <pre>, <code>, <textarea>, <script>, <style>
+    s = re.sub(r"(?is)<(pre|code|textarea|script|style)\b.*?>.*?</\1>", stash, s)
+    # Minification sûre (entre balises uniquement)
+    s = re.sub(r">\s+<", "><", s).strip()
+    # Restaurer
+    for i,blk in enumerate(keep):
+        s = s.replace(f"<!--__TB_KEEP_{i}__-->", blk)
+    return s
 
 # ===================== Helpers =====================
 def read_site(site_path:Path)->dict:
