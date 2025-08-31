@@ -24,6 +24,8 @@ def parse_args():
     p.add_argument("--serve", action="store_true", help="serve from memory (no files written)")
     p.add_argument("--host", default="127.0.0.1", help="dev server host")
     p.add_argument("--port", type=int, default=8080, help="dev server port")
+    # Nouveau: URL vers le CSS de thème (servi depuis /assets/)
+    p.add_argument("--theme-css", default="assets/css/theme.css", help="URL du fichier CSS de thème (servi via /assets)")
     return p.parse_args()
 
 # ===================== Markdown engines =====================
@@ -169,7 +171,7 @@ BASE_CSS = (
 "/* Inline code - no line breaks */"
 "code:not(pre code){padding:3px 6px;border:1px solid var(--card-border);border-radius:4px;background:rgba(127,127,127,.08);font-size:0.9em;white-space:nowrap;word-wrap:normal;overflow-wrap:normal}"
 "/* Better mobile handling */"
-"@media(max-width:768px){pre{font-size:13px;padding:12px;margin:12px -3vw;border-radius:0;border-left:none;border-right:none;line-height:1.3;max-height:60vh}code:not(pre code){font-size:0.85em;padding:2px 4px}}"
+"@media(max-width:768px){pre{font-size:13px;padding:12px;border-right:none;line-height:1.3;max-height:60vh}code:not(pre code){font-size:0.85em;padding:2px 4px}}"
 "@media(max-width:480px){pre{font-size:12px;padding:10px;line-height:1.25;max-height:50vh}code:not(pre code){font-size:0.8em}}"
 "img{max-width:100%;height:auto;border-radius:6px}"
 "table{width:100%;border-collapse:collapse;display:block;overflow-x:auto}"
@@ -323,8 +325,9 @@ def build_nav(site_title:str, base_url:str, categories_sorted:list[tuple[str,str
             '<button id="themeToggle" class="btn" aria-label="Toggle theme" title="Toggle theme">🌙</button>'
             f'</div><div class="navwrap menu-panel">{links}{select}</div></div>')
 
-def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, palette_css:str, nav_html:str, favicon_url:str|None)->str:
+def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, palette_css:str, nav_html:str, favicon_url:str|None, theme_css_url:str|None)->str:
     favicon_tag = f'<link rel=icon href="{html.escape(favicon_url)}">' if favicon_url else ""
+    theme_link = f'<link rel=stylesheet href="{html.escape(theme_css_url)}">' if theme_css_url else ""
     return (
         "<!doctype html><meta charset=utf-8>"
         f"<title>{html.escape(doc_title)}</title>"
@@ -334,8 +337,10 @@ def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, pale
         "<link rel=preconnect href=https://fonts.googleapis.com>"
         "<link rel=preconnect href=https://fonts.gstatic.com crossorigin>"
         "<link href='https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Geist:wght@100..900&family=Ubuntu+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap' rel=stylesheet>"
+        f"{theme_link}"
         f"<script>{THEME_BOOT_JS}</script>"
-        f"<style>{BASE_CSS}{palette_css}</style>"
+        # On ne garde inline que la palette (petite)
+        f"<style>{palette_css}</style>"
         f"{nav_html}<main><header><h1>{html.escape(doc_title)}</h1></header>"
         f"{body_html}<footer></footer></main>"
         "<script src=https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js></script>"
@@ -486,6 +491,39 @@ def build(args):
     favicon_url = make_asset_url(site.get("favicon"), args.base_url)
     default_thumb_url = make_asset_url(site.get("defaultThumbnail"), args.base_url)
 
+    # Résolution du CSS de thème:
+    # Priorité: site.theme -> site.themeCss -> --theme-css
+    theme_css_url=None
+    theme_rel=None
+    theme = site.get("theme")
+    if isinstance(theme, str) and theme.strip():
+        t = theme.strip()
+        if t.startswith(("http://","https://")):
+            theme_css_url = t
+        elif t.endswith(".css"):
+            theme_rel = t.lstrip("/") if not t.startswith("assets/") else t[len("assets/"):]
+        else:
+            # nom de thème => assets/themes/<nom>.css
+            theme_rel = f"themes/{slugify(t)}.css"
+    else:
+        theme_css_setting = site.get("themeCss") or args.theme_css  # ex: "assets/css/theme.css" ou URL complète
+        if theme_css_setting:
+            if theme_css_setting.startswith(("http://","https://")):
+                theme_css_url = theme_css_setting
+            else:
+                rel = theme_css_setting.lstrip("/")
+                theme_rel = rel[len("assets/"):] if rel.startswith("assets/") else rel
+
+    if theme_rel:
+        # URL publique
+        theme_css_url = args.base_url.rstrip("/") + "/assets/" + theme_rel
+        # Auto-génération si manquant (écrit BASE_CSS)
+        css_fs = public_dir / theme_rel
+        if not css_fs.exists():
+            css_fs.parent.mkdir(parents=True, exist_ok=True)
+            css_fs.write_text(BASE_CSS, encoding="utf-8")
+    # ...existing code...
+
     posts, pages = collect_entries(content_dir)
     posts.sort(key=lambda p:p["date_obj"], reverse=True)
 
@@ -503,14 +541,13 @@ def build(args):
     nav_html=build_nav(site.get("title","TinyBlog"), args.base_url, categories_sorted, pages)
 
     rendered={}
-
     # index
     idx_body=build_ordered_list(posts, args.base_url, default_thumb_url)
-    rendered["/index.html"]=minify_html(render_page("Home", idx_body, site.get("title","TinyBlog"), args.base_url, pal_css, nav_html, favicon_url))
+    rendered["/index.html"]=minify_html(render_page("Home", idx_body, site.get("title","TinyBlog"), args.base_url, pal_css, nav_html, favicon_url, theme_css_url))
 
-    # Modifié : générer toutes les pages au lieu de seulement "about"
+    # pages
     for slug, page_data in pages.items():
-        rendered[f"/{slug}.html"]=minify_html(render_page(page_data["title"], md_render(page_data["md"]), site.get("title","TinyBlog"), args.base_url, pal_css, nav_html, favicon_url))
+        rendered[f"/{slug}.html"]=minify_html(render_page(page_data["title"], md_render(page_data["md"]), site.get("title","TinyBlog"), args.base_url, pal_css, nav_html, favicon_url, theme_css_url))
 
     # posts
     for p in posts:
@@ -518,14 +555,13 @@ def build(args):
                        for n,s in zip(p["categories"],p["categories_slug"]))
         head=f'<div class="postmeta"><span>{p["date_str"]}</span>{chips}</div>'
         body_html=head+md_render(p["md"])
-        rendered[f"/{p['slug']}.html"]=minify_html(render_page(p["title"], body_html, site.get("title","TinyBlog"), args.base_url, pal_css, nav_html, favicon_url))
+        rendered[f"/{p['slug']}.html"]=minify_html(render_page(p["title"], body_html, site.get("title","TinyBlog"), args.base_url, pal_css, nav_html, favicon_url, theme_css_url))
 
     # categories
     for slug,(name,plist) in cat_map.items():
         plist_sorted=sorted(plist,key=lambda p:p["date_obj"],reverse=True)
         body=build_ordered_list(plist_sorted, args.base_url, default_thumb_url)
-        rendered[f"/category/{slug}.html"]=minify_html(render_page(f"Category · {name}", body, site.get("title","TinyBlog"), args.base_url, pal_css, nav_html, favicon_url))
-
+        rendered[f"/category/{slug}.html"]=minify_html(render_page(f"Category · {name}", body, site.get("title","TinyBlog"), args.base_url, pal_css, nav_html, favicon_url, theme_css_url))
     if args.serve:
         _MemHandler.pages=rendered
         _MemHandler.public_dir=public_dir if public_dir.exists() else None
