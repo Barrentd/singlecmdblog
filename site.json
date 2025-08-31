@@ -1,3 +1,5 @@
 {
-  "title": "My Blog devops"
+  "title": "My Blog devops",
+  "favicon": "assets/favicon.ico",
+  "defaultThumbnail": "assets/default-thumb.png"
 }

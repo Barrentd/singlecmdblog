@@ -323,21 +323,25 @@ def build_nav(site_title:str, base_url:str, categories_sorted:list[tuple[str,str
             '<button id="themeToggle" class="btn" aria-label="Toggle theme" title="Toggle theme">🌙</button>'
             f'</div><div class="navwrap menu-panel">{links}{select}</div></div>')
 
-def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, palette_css:str, nav_html:str)->str:
-    return ("<!doctype html><meta charset=utf-8>"
-            f"<title>{html.escape(doc_title)}</title>"
-            "<meta name=viewport content='width=device-width,initial-scale=1'>"
-            "<meta name=generator content=TinyBlog>"
-            "<link rel=preconnect href=https://fonts.googleapis.com>"
-            "<link rel=preconnect href=https://fonts.gstatic.com crossorigin>"
-            "<link href='https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Geist:wght@100..900&family=Ubuntu+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap' rel=stylesheet>"
-            f"<script>{THEME_BOOT_JS}</script>"
-            f"<style>{BASE_CSS}{palette_css}</style>"
-            f"{nav_html}<main><header><h1>{html.escape(doc_title)}</h1></header>"
-            f"{body_html}<footer></footer></main>"
-            "<script src=https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js></script>"
-            "<script>hljs.highlightAll();</script>"
-            f"<script>{NAV_JS}</script>")
+def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, palette_css:str, nav_html:str, favicon_url:str|None)->str:
+    favicon_tag = f'<link rel=icon href="{html.escape(favicon_url)}">' if favicon_url else ""
+    return (
+        "<!doctype html><meta charset=utf-8>"
+        f"<title>{html.escape(doc_title)}</title>"
+        "<meta name=viewport content='width=device-width,initial-scale=1'>"
+        "<meta name=generator content=TinyBlog>"
+        f"{favicon_tag}"
+        "<link rel=preconnect href=https://fonts.googleapis.com>"
+        "<link rel=preconnect href=https://fonts.gstatic.com crossorigin>"
+        "<link href='https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Geist:wght@100..900&family=Ubuntu+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap' rel=stylesheet>"
+        f"<script>{THEME_BOOT_JS}</script>"
+        f"<style>{BASE_CSS}{palette_css}</style>"
+        f"{nav_html}<main><header><h1>{html.escape(doc_title)}</h1></header>"
+        f"{body_html}<footer></footer></main>"
+        "<script src=https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js></script>"
+        "<script>hljs.highlightAll();</script>"
+        f"<script>{NAV_JS}</script>"
+    )
 
 def minify_html(s:str)->str:
     # Protéger le contenu sensible aux espaces
@@ -360,6 +364,14 @@ def read_site(site_path:Path)->dict:
 
 def slugify(s:str)->str:
     s=s.lower(); s=re.sub(r"[^a-z0-9]+","-",s).strip("-"); return re.sub(r"-{2,}","-",s) or "uncategorized"
+
+def make_asset_url(u:str|None, base_url:str)->str|None:
+    if not u: return None
+    u=u.strip()
+    if not u: return None
+    if u.startswith(("http://","https://","data:")): return u
+    if u.startswith("/"): return base_url.rstrip("/") + u
+    return base_url + u  # p.ex. "assets/img.png" -> "<base_url>assets/img.png"
 
 def excerpt_from_md(md:str, limit:int=160)->str:
     for line in md.splitlines():
@@ -393,15 +405,16 @@ def collect_entries(content_dir:Path):
             posts.append(entry)
     return posts, pages
 
-def build_ordered_list(items, base_url:str)->str:
+def build_ordered_list(items, base_url:str, default_thumb_url:str|None=None)->str:
     cards=[]
     for p in items:
-        # Thumbnail
-        if p.get("thumbnail"):
-            thumb_html = f'<div class="postthumbnail"><img src="{html.escape(p["thumbnail"])}" alt="Thumbnail for {html.escape(p["title"])}" loading="lazy"></div>'
+        # Thumbnail (avec valeur par défaut si manquante)
+        img_url = make_asset_url(p.get("thumbnail"), base_url) or default_thumb_url
+        if img_url:
+            thumb_html = f'<div class="postthumbnail"><img src="{html.escape(img_url)}" alt="Thumbnail for {html.escape(p["title"])}" loading="lazy"></div>'
         else:
             thumb_html = '<div class="postthumbnail"><div class="postthumbnail-placeholder">📄</div></div>'
-        
+
         # Categories chips
         chips = " ".join(f'<span class="chip">{html.escape(n)}</span>'
                         for n in p["categories"])
@@ -469,6 +482,10 @@ def build(args):
 
     pal_css=palette_override(site.get("palette"), site.get("paletteDark"))
 
+    # URLs d’assets depuis la config (compatibles base_url)
+    favicon_url = make_asset_url(site.get("favicon"), args.base_url)
+    default_thumb_url = make_asset_url(site.get("defaultThumbnail"), args.base_url)
+
     posts, pages = collect_entries(content_dir)
     posts.sort(key=lambda p:p["date_obj"], reverse=True)
 
@@ -488,12 +505,12 @@ def build(args):
     rendered={}
 
     # index
-    idx_body=build_ordered_list(posts, args.base_url)
-    rendered["/index.html"]=minify_html(render_page("Home", idx_body, site.get("title","TinyBlog"), args.base_url, pal_css, nav_html))
+    idx_body=build_ordered_list(posts, args.base_url, default_thumb_url)
+    rendered["/index.html"]=minify_html(render_page("Home", idx_body, site.get("title","TinyBlog"), args.base_url, pal_css, nav_html, favicon_url))
 
     # Modifié : générer toutes les pages au lieu de seulement "about"
     for slug, page_data in pages.items():
-        rendered[f"/{slug}.html"]=minify_html(render_page(page_data["title"], md_render(page_data["md"]), site.get("title","TinyBlog"), args.base_url, pal_css, nav_html))
+        rendered[f"/{slug}.html"]=minify_html(render_page(page_data["title"], md_render(page_data["md"]), site.get("title","TinyBlog"), args.base_url, pal_css, nav_html, favicon_url))
 
     # posts
     for p in posts:
@@ -501,13 +518,13 @@ def build(args):
                        for n,s in zip(p["categories"],p["categories_slug"]))
         head=f'<div class="postmeta"><span>{p["date_str"]}</span>{chips}</div>'
         body_html=head+md_render(p["md"])
-        rendered[f"/{p['slug']}.html"]=minify_html(render_page(p["title"], body_html, site.get("title","TinyBlog"), args.base_url, pal_css, nav_html))
+        rendered[f"/{p['slug']}.html"]=minify_html(render_page(p["title"], body_html, site.get("title","TinyBlog"), args.base_url, pal_css, nav_html, favicon_url))
 
     # categories
     for slug,(name,plist) in cat_map.items():
         plist_sorted=sorted(plist,key=lambda p:p["date_obj"],reverse=True)
-        body=build_ordered_list(plist_sorted, args.base_url)
-        rendered[f"/category/{slug}.html"]=minify_html(render_page(f"Category · {name}", body, site.get("title","TinyBlog"), args.base_url, pal_css, nav_html))
+        body=build_ordered_list(plist_sorted, args.base_url, default_thumb_url)
+        rendered[f"/category/{slug}.html"]=minify_html(render_page(f"Category · {name}", body, site.get("title","TinyBlog"), args.base_url, pal_css, nav_html, favicon_url))
 
     if args.serve:
         _MemHandler.pages=rendered
@@ -524,6 +541,8 @@ def build(args):
         out_file.parent.mkdir(parents=True, exist_ok=True)
         out_file.write_text(html_doc, encoding="utf-8")
         bytes_ok(out_file, args.max_bytes)
+    # Toujours créer le dossier assets (même s'il n'y a rien à copier)
+    (out_dir/"assets").mkdir(parents=True, exist_ok=True)
     if public_dir.exists():
         for src in public_dir.rglob("*"):
             if src.is_file():
