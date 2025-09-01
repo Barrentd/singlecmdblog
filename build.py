@@ -210,6 +210,12 @@ BASE_CSS = (
 "/* disable transitions for users who prefer reduced motion */"
 "@media(prefers-reduced-motion:reduce){html,body,main,pre,code,.postcard,.navbar,.btn,.catselect,.chip{transition:none!important}}"
 "meta,link,script,style{display:none}"
+"/* Social icons */"
+".social-links{display:flex;gap:12px;align-items:center}"
+".social-link{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;background:var(--card);border:1px solid var(--card-border);color:var(--muted);text-decoration:none;transition:background-color 0.2s ease,color 0.2s ease,transform 0.2s ease}"
+".social-link:hover{background:var(--accent);color:var(--bg);transform:scale(1.1);text-decoration:none}"
+".social-icon{width:18px;height:18px;display:block}"
+"@media(max-width:700px){.social-links{order:1;width:100%;justify-content:center;margin-top:8px}}"
 )
 
 def palette_override(light:dict|None, dark:dict|None)->str:
@@ -301,7 +307,7 @@ NAV_JS = (
 "})();"
 )
 
-def build_nav(site_title:str, base_url:str, categories_sorted:list[tuple[str,str]], pages:dict)->str:
+def build_nav(site_title:str, base_url:str, categories_sorted:list[tuple[str,str]], pages:dict, social_links_html:str="")->str:
     # Construire les liens de navigation pour toutes les pages
     nav_links = [f'<a class="navlink" href="{base_url}index.html">Home</a>']
     
@@ -318,12 +324,15 @@ def build_nav(site_title:str, base_url:str, categories_sorted:list[tuple[str,str
                 f'<option value="{base_url}index.html">All</option>{opts}</select>')
     else:
         select=""
+    
     return ('<div class="navbar"><div class="navwrap">'
             f'<a class="brand navlink" href="{base_url}index.html">{html.escape(site_title)}</a>'
             '<span class="spacer"></span>'
             '<button id="menuToggle" class="btn" aria-label="Menu" title="Menu">☰</button>'
             '<button id="themeToggle" class="btn" aria-label="Toggle theme" title="Toggle theme">🌙</button>'
-            f'</div><div class="navwrap menu-panel">{links}{select}</div></div>')
+            '</div><div class="navwrap menu-panel">'
+            f'{links}{select}{social_links_html}'
+            '</div></div>')
 
 def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, palette_css:str, nav_html:str, favicon_url:str|None, theme_css_url:str|None)->str:
     favicon_tag = f'<link rel=icon href="{html.escape(favicon_url)}">' if favicon_url else ""
@@ -484,10 +493,13 @@ def build(args):
     public_dir=root/args.public
     out_dir=root/args.out
     site=read_site(root/args.site)
-
+    
+    # Génération des liens sociaux (modifié pour passer base_url)
+    social_links_html = build_social_links(site.get("social", {}), args.base_url)
+    
     pal_css=palette_override(site.get("palette"), site.get("paletteDark"))
 
-    # URLs d’assets depuis la config (compatibles base_url)
+    # URLs d'assets depuis la config (compatibles base_url)
     favicon_url = make_asset_url(site.get("favicon"), args.base_url)
     default_thumb_url = make_asset_url(site.get("defaultThumbnail"), args.base_url)
 
@@ -522,7 +534,6 @@ def build(args):
         if not css_fs.exists():
             css_fs.parent.mkdir(parents=True, exist_ok=True)
             css_fs.write_text(BASE_CSS, encoding="utf-8")
-    # ...existing code...
 
     posts, pages = collect_entries(content_dir)
     posts.sort(key=lambda p:p["date_obj"], reverse=True)
@@ -538,8 +549,8 @@ def build(args):
     categories_sorted=sorted([(v[0],k) for k,v in cat_map.items()], key=lambda x:x[0].lower())
 
     # Modifié : passer les pages au lieu de has_about
-    nav_html=build_nav(site.get("title","TinyBlog"), args.base_url, categories_sorted, pages)
-
+    nav_html=build_nav(site.get("title","TinyBlog"), args.base_url, categories_sorted, pages, social_links_html)
+    
     rendered={}
     # index
     idx_body=build_ordered_list(posts, args.base_url, default_thumb_url)
@@ -587,6 +598,59 @@ def build(args):
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src,dst)
     print(f"[DONE] {len(posts)} post(s), {len(cat_map)} category page(s) + index @ {time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+def build_social_links(social_config: dict, base_url: str) -> str:
+    """Génère les liens vers les réseaux sociaux avec icônes SVG"""
+    if not social_config:
+        return ""
+    
+    # Mapping étendu pour toutes les icônes disponibles
+    icon_files = {
+        "twitter": "twitter",
+        "twitter-x": "twitter-x",
+        "x": "twitter-x",
+        "github": "github",
+        "gitlab": "gitlab",
+        "linkedin": "linkedin",
+        "facebook": "facebook",
+        "instagram": "instagram",
+        "youtube": "youtube",
+        "discord": "discord",
+        "dribbble": "dribbble",
+        "medium": "medium",
+        "messenger": "messenger",
+        "pinterest": "pinterest",
+        "quora": "quora",
+        "reddit": "reddit",
+        "skype": "skype",
+        "spotify": "spotify",
+        "telegram": "telegram",
+        "tiktok": "tiktok",
+        "twitch": "twitch",
+        "whatsapp": "whatsapp"
+    }
+    
+    links = []
+    for platform, url in social_config.items():
+        if not url:
+            continue
+        
+        platform_lower = platform.lower()
+        icon_name = icon_files.get(platform_lower, platform_lower)
+        icon_url = f"{base_url}assets/icons/{icon_name}.svg"
+        title = platform.capitalize()
+        
+        links.append(
+            f'<a class="social-link" href="{html.escape(url)}" '
+            f'title="{html.escape(title)}" target="_blank" rel="noopener">'
+            f'<img src="{html.escape(icon_url)}" alt="{html.escape(title)}" class="social-icon">'
+            f'</a>'
+        )
+    
+    if not links:
+        return ""
+    
+    return f'<div class="social-links">{"".join(links)}</div>'
 
 if __name__=="__main__":
     build(parse_args())
