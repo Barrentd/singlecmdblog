@@ -1,0 +1,29 @@
+FROM python:3.11-alpine
+
+# Installer nginx
+RUN apk add --no-cache nginx
+
+# Créer répertoire de travail
+WORKDIR /app
+
+# Copier les fichiers du projet
+COPY . .
+
+# Builder le site
+RUN python3 build.py
+
+# Supprimer la config par défaut d'Alpine
+RUN rm -f /etc/nginx/http.d/default.conf && \
+    echo 'server { \
+        listen 80; \
+        root /app/build; \
+        index index.html; \
+        location / { try_files $uri $uri.html $uri/ /index.html; } \
+        location /assets/ { expires 1d; } \
+    }' > /etc/nginx/http.d/tinyblog.conf
+
+# Exposer le port
+EXPOSE 80
+
+# Démarrer nginx
+CMD ["nginx", "-g", "daemon off;"]

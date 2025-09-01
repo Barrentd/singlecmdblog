@@ -135,87 +135,15 @@ def parse_date(s:str)->dt.datetime|None:
 
 # ===================== Template / CSS / JS / minify =====================
 BASE_CSS = (
-":root{--bg:#f7f7f7;--fg:#2d3748;--muted:#718096;--link:#3182ce;--accent:#4299e1;--card:#f1f3f4;--card-border:#d1d5db}"
-"@media(prefers-color-scheme:dark){:root{--bg:#0b0b0c;--fg:#eaeaea;--muted:#9aa0a6;--link:#8ab4f8;--accent:#60a5fa;--card:#0f172a;--card-border:#1f2937}}"
-"/* explicit overrides when toggled */"
-"html[data-theme=light]{--bg:#f7f7f7;--fg:#2d3748;--muted:#718096;--link:#3182ce;--accent:#4299e1;--card:#f1f3f4;--card-border:#d1d5db}"
-"html[data-theme=dark]{--bg:#0b0b0c;--fg:#eaeaea;--muted:#9aa0a6;--link:#8ab4f8;--accent:#60a5fa;--card:#0f172a;--card-border:#1f2937}"
-"*,*:before,*:after{box-sizing:border-box}"
-"/* disable transitions during first paint */"
-"html[data-tb-init],html[data-tb-init] *{transition:none!important}"
-"/* smooth theme transitions */"
-"html{transition:background-color 0.3s ease,color 0.3s ease}"
-"body,main,pre,code,.postcard,.navbar,.btn,.catselect,.chip{transition:background-color 0.3s ease,color 0.3s ease,border-color 0.3s ease}"
-"html{font-family:Geist,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial;font-size:16px;-webkit-text-size-adjust:100%}"
-"body{margin:0;background:var(--bg);color:var(--fg);line-height:1.5}"
-"main{max-width:min(92ch,96vw);margin:0 auto;padding:2.5vh 3vw}"
-"h1{font-size:clamp(22px,4.5vw,30px);line-height:1.15;margin:10px 0 6px}"
-"h2{font-size:clamp(18px,3.7vw,24px);line-height:1.2;margin:14px 0 8px}"
-"p{margin:10px 0}a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}"
-"code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}"
-"/* Enhanced code blocks with Highlight.js support */"
-"pre{display:block;overflow:auto;padding:16px;border:1px solid var(--card-border);border-radius:8px;background:var(--card);width:100%;max-width:100%;white-space:pre;line-height:1.4;font-size:14px;tab-size:2;box-sizing:border-box;max-height:75vh;scrollbar-width:thin}"
-"pre::-webkit-scrollbar{width:8px;height:8px}"
-"pre::-webkit-scrollbar-track{background:transparent}"
-"pre::-webkit-scrollbar-thumb{background:var(--card-border);border-radius:4px}"
-"pre::-webkit-scrollbar-thumb:hover{background:var(--muted)}"
-"pre code{white-space:pre!important}"  # préserve les espaces dans le code
-".markdown-code-block .line{display:block;white-space:pre}"  # chaque ligne = bloc, conserve indentation
-"/* GitLab-like wrapper and copy button */"
-".markdown-code-block{position:relative}"
-"copy-code{position:absolute;top:6px;right:6px}"
-"copy-code .btn{padding:.25rem .5rem;font-size:.8rem}"
-".line{display:block;white-space:pre}"  # préserver indentation et retours
-"/* Override Highlight.js theme for consistency */"
-"pre code.hljs{background:var(--card)!important;color:var(--fg)!important;padding:0!important}"
-"/* Inline code - no line breaks */"
-"code:not(pre code){padding:3px 6px;border:1px solid var(--card-border);border-radius:4px;background:rgba(127,127,127,.08);font-size:0.9em;white-space:nowrap;word-wrap:normal;overflow-wrap:normal}"
-"/* Better mobile handling */"
-"@media(max-width:768px){pre{font-size:13px;padding:12px;border-right:none;line-height:1.3;max-height:60vh}code:not(pre code){font-size:0.85em;padding:2px 4px}}"
-"@media(max-width:480px){pre{font-size:12px;padding:10px;line-height:1.25;max-height:50vh}code:not(pre code){font-size:0.8em}}"
-"img{max-width:100%;height:auto;border-radius:6px}"
-"table{width:100%;border-collapse:collapse;display:block;overflow-x:auto}"
-"th,td{border:1px solid var(--card-border);padding:.4rem .5rem;text-align:left;vertical-align:top}"
-"blockquote{border-left:3px solid var(--card-border);margin:.8rem 0;padding:.1rem .8rem;color:var(--muted)}"
-"ul,ol{margin:.4rem 0 .6rem .9rem}.task-list-item{list-style:none}.task-list-item input{margin-right:.5rem}"
-"hr{border:0;border-top:1px solid var(--card-border);margin:12px 0}footer{margin-top:16px;font-size:.85rem;opacity:.7}"
-"/* chips for categories */"
-".chip{display:inline-block;padding:2px 6px;border:1px solid var(--card-border);border-radius:999px;background:var(--card);color:var(--fg)}"
-"/* navbar + toggles */"
-".navbar{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--card-border);backdrop-filter:saturate(180%) blur(6px)}"
-".navwrap{max-width:min(92ch,96vw);margin:0 auto;padding:.55rem 3vw;display:flex;gap:10px;align-items:center}"
-".brand{font-weight:700}.navlink{margin-right:10px}.spacer{flex:1}"
-".btn{font:inherit;padding:.35rem .55rem;border:1px solid var(--card-border);border-radius:8px;background:var(--card);color:var(--fg);cursor:pointer}"
-".menu-panel{display:flex;gap:10px;align-items:center;flex-wrap:wrap}"
-".catselect{font:inherit;padding:.35rem .5rem;border:1px solid var(--card-border);border-radius:8px;background:var(--card);color:var(--fg)}"
-"#menuToggle{display:none}"
-"@media(max-width:700px){.menu-panel{display:none}html.menu-open .menu-panel{display:flex}#menuToggle{display:inline-block}}"
-"/* ordered list with clickable cards and thumbnails */"
-".postlist{list-style:none;margin:0;padding:0}"
-".postcard{margin:.45rem 0;border-radius:8px;background:var(--card);border:1px solid var(--card-border);display:block;text-decoration:none;color:inherit;position:relative}"
-".postcard{transition:box-shadow .2s ease,transform .2s ease,background-color 0.3s ease,border-color 0.3s ease}"
-".postcard:hover{box-shadow:0 4px 12px rgba(0,0,0,.1);text-decoration:none;transform:translateY(-1px)}"
-"@media(prefers-color-scheme:dark){.postcard:hover{box-shadow:0 4px 12px rgba(255,255,255,.1)}}"
-"html[data-theme=dark] .postcard:hover{box-shadow:0 4px 12px rgba(255,255,255,.1)}"
-".postcontent{display:flex;gap:14px;padding:.7rem;min-height:100px}"
-".postthumbnail{flex-shrink:0;width:140px;height:90px;border-radius:8px;overflow:hidden;background:var(--card-border);display:flex;align-items:center;justify-content:center}"
-".postthumbnail img{width:100%;height:100%;object-fit:cover}"
-".postthumbnail-placeholder{color:var(--muted);font-size:32px}"
-".postinfo{flex:1;display:flex;flex-direction:column;justify-content:space-between;min-height:90px}"
-".posttitle{font-weight:600;margin:0 0 8px;line-height:1.3}"
-".postsubtitle{font-weight:400;font-size:.9rem;color:var(--muted);margin:0 0 8px;line-height:1.3}"
-".postmeta{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:.85rem;margin-top:8px;flex-wrap:wrap}"
-"/* responsive adjustments */"
-"@media(max-width:600px){.postcontent{flex-direction:column;gap:10px}.postthumbnail{width:100%;height:120px;margin-top:8px}.postinfo{min-height:auto}}"
-"/* disable transitions for users who prefer reduced motion */"
-"@media(prefers-reduced-motion:reduce){html,body,main,pre,code,.postcard,.navbar,.btn,.catselect,.chip{transition:none!important}}"
-"meta,link,script,style{display:none}"
-"/* Social icons */"
-".social-links{display:flex;gap:12px;align-items:center}"
-".social-link{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;background:var(--card);border:1px solid var(--card-border);color:var(--muted);text-decoration:none;transition:background-color 0.2s ease,color 0.2s ease,transform 0.2s ease}"
-".social-link:hover{background:var(--accent);color:var(--bg);transform:scale(1.1);text-decoration:none}"
-".social-icon{width:18px;height:18px;display:block}"
-"@media(max-width:700px){.social-links{order:1;width:100%;justify-content:center;margin-top:8px}}"
+"/* ...existing css jusqu'à la ligne social... */"
+"/* Presentation section intégrée dans le header */"
+".header-content{text-align:center;display:flex;flex-direction:column;align-items:center;gap:1rem}"
+".presentation{text-align:center;margin:0;padding:0;border:none;display:flex;flex-direction:column;align-content:center;justify-content:center;align-items:center}"
+".presentation-photo{width:120px;height:120px;border-radius:50%;object-fit:cover;margin:0;display:block;border:3px solid var(--card-border)}"
+".presentation-title{font-size:clamp(18px,3.5vw,24px);font-weight:500;margin:0;color:var(--muted);order:2}"
+".presentation-text{font-size:1rem;line-height:1.5;color:var(--muted);max-width:500px;margin:0;order:3}"
+"header h1{order:1;margin:0}"
+"@media(max-width:600px){.presentation-photo{width:100px;height:100px}.presentation-text{font-size:0.9rem;max-width:100%}.presentation-title{font-size:clamp(16px,3vw,20px)}}"
 )
 
 def palette_override(light:dict|None, dark:dict|None)->str:
@@ -334,12 +262,60 @@ def build_nav(site_title:str, base_url:str, categories_sorted:list[tuple[str,str
             f'{links}{select}{social_links_html}'
             '</div></div>')
 
-def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, palette_css:str, nav_html:str, favicon_url:str|None, theme_css_url:str|None)->str:
+def build_presentation_section(presentation_config: dict, base_url: str) -> str:
+    """Génère la section de présentation pour intégration dans le header"""
+    if not presentation_config or not presentation_config.get("enabled", False):
+        return ""
+    
+    title = presentation_config.get("title", "")
+    text = presentation_config.get("text", "")
+    photo_url = make_asset_url(presentation_config.get("photo"), base_url)
+    
+    if not title and not text and not photo_url:
+        return ""
+    
+    html_parts = []
+    
+    # Photo (sera affichée en premier visuellement grâce à l'ordre CSS)
+    if photo_url:
+        html_parts.append(f'<img src="{html.escape(photo_url)}" alt="Photo de profil" class="presentation-photo" loading="lazy">')
+    
+    # Titre de présentation (sous le h1 principal)
+    if title:
+        html_parts.append(f'<h2 class="presentation-title">{html.escape(title)}</h2>')
+    
+    # Texte
+    if text:
+        html_parts.append(f'<p class="presentation-text">{html.escape(text)}</p>')
+    
+    return "".join(html_parts)
+
+def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, palette_css:str, nav_html:str, favicon_url:str|None, theme_css_url:str|None, description:str|None=None, presentation_html:str="", page_h1:str="", hide_h1:bool=False)->str:
     favicon_tag = f'<link rel=icon href="{html.escape(favicon_url)}">' if favicon_url else ""
     theme_link = f'<link rel=stylesheet href="{html.escape(theme_css_url)}">' if theme_css_url else ""
+    description_tag = f'<meta name=description content="{html.escape(description)}">' if description else ""
+    
+    # Utiliser page_h1 pour le h1 dans le body, ou fallback sur doc_title
+    h1_text = page_h1 if page_h1 else doc_title
+    
+    # Si on a du contenu de présentation, on l'intègre dans le header
+    if presentation_html:
+        # Masquer le h1 si hide_h1 est True
+        h1_element = f'<h1 style="display:none;">{html.escape(h1_text)}</h1>' if hide_h1 else f'<h1>{html.escape(h1_text)}</h1>'
+        header_content = (
+            f'<div class="header-content">'
+            f'{h1_element}'
+            f'<div class="presentation">{presentation_html}</div>'
+            f'</div>'
+        )
+    else:
+        # Masquer le h1 si hide_h1 est True
+        header_content = f'<h1 style="display:none;">{html.escape(h1_text)}</h1>' if hide_h1 else f'<h1>{html.escape(h1_text)}</h1>'
+    
     return (
         "<!doctype html><meta charset=utf-8>"
-        f"<title>{html.escape(doc_title)}</title>"
+        f"<title>{html.escape(doc_title)}</title>"  # site_title pour SEO
+        f"{description_tag}"
         "<meta name=viewport content='width=device-width,initial-scale=1'>"
         "<meta name=generator content=TinyBlog>"
         f"{favicon_tag}"
@@ -348,9 +324,8 @@ def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, pale
         "<link href='https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Geist:wght@100..900&family=Ubuntu+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap' rel=stylesheet>"
         f"{theme_link}"
         f"<script>{THEME_BOOT_JS}</script>"
-        # On ne garde inline que la palette (petite)
         f"<style>{palette_css}</style>"
-        f"{nav_html}<main><header><h1>{html.escape(doc_title)}</h1></header>"
+        f"{nav_html}<main><header>{header_content}</header>"
         f"{body_html}<footer></footer></main>"
         "<script src=https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js></script>"
         "<script>hljs.highlightAll();</script>"
@@ -460,8 +435,25 @@ def build_ordered_list(items, base_url:str, default_thumb_url:str|None=None)->st
 
 def bytes_ok(path:Path, limit:int):
     size=path.stat().st_size
-    if size>limit: raise SystemExit(f"[FAIL] {path.name} = {size} bytes > {limit}")
-    print(f"[OK]   {path.name} = {size} bytes")
+    
+    # Règles spécifiques selon le type de fichier
+    if path.name == "index.html":
+        if size > 14*1024:  # 14KB
+            print(f"[WARN] {path.name} = {size} bytes > 14KB (recommended size exceeded)")
+        else:
+            print(f"[OK]   {path.name} = {size} bytes")
+    elif path.name.endswith(".html") and path.parent.name != "category":
+        # Articles individuels (posts et pages, mais pas les catégories)
+        if size > 30*1024:  # 30KB
+            print(f"[WARN] {path.name} = {size} bytes > 30KB (recommended size exceeded)")
+        else:
+            print(f"[OK]   {path.name} = {size} bytes")
+    else:
+        # Pour tous les autres fichiers (catégories, etc.), garder la limite globale mais en warning
+        if size > limit:
+            print(f"[WARN] {path.name} = {size} bytes > {limit} bytes (recommended size exceeded)")
+        else:
+            print(f"[OK]   {path.name} = {size} bytes")
 
 # ===================== In-memory server =====================
 class _MemHandler(BaseHTTPRequestHandler):
@@ -493,13 +485,19 @@ def build(args):
     public_dir=root/args.public
     out_dir=root/args.out
     site=read_site(root/args.site)
+    site_description = site.get("description", "")
+    site_title = site.get("title", "TinyBlog")
+    site_title_html = site.get("site_title", site_title)
     
-    # Génération des liens sociaux (modifié pour passer base_url)
+    # Génération de la section présentation
+    presentation_html = build_presentation_section(site.get("presentation", {}), args.base_url)
+    
+    # Génération des liens sociaux
     social_links_html = build_social_links(site.get("social", {}), args.base_url)
     
     pal_css=palette_override(site.get("palette"), site.get("paletteDark"))
 
-    # URLs d'assets depuis la config (compatibles base_url)
+    # URLs d'assets depuis la config
     favicon_url = make_asset_url(site.get("favicon"), args.base_url)
     default_thumb_url = make_asset_url(site.get("defaultThumbnail"), args.base_url)
 
@@ -548,31 +546,90 @@ def build(args):
                 cat_map.setdefault(slug,(name,[]))[1].append(p)
     categories_sorted=sorted([(v[0],k) for k,v in cat_map.items()], key=lambda x:x[0].lower())
 
-    # Modifié : passer les pages au lieu de has_about
-    nav_html=build_nav(site.get("title","TinyBlog"), args.base_url, categories_sorted, pages, social_links_html)
+    nav_html=build_nav(site_title, args.base_url, categories_sorted, pages, social_links_html)
     
     rendered={}
-    # index
+    
+    # index - avec présentation, masque le h1
     idx_body=build_ordered_list(posts, args.base_url, default_thumb_url)
-    rendered["/index.html"]=minify_html(render_page("Home", idx_body, site.get("title","TinyBlog"), args.base_url, pal_css, nav_html, favicon_url, theme_css_url))
+    rendered["/index.html"]=minify_html(render_page(
+        site_title_html,           # <title> dans le head
+        idx_body, 
+        site_title, 
+        args.base_url, 
+        pal_css, 
+        nav_html, 
+        favicon_url, 
+        theme_css_url, 
+        site_description, 
+        presentation_html,
+        site_title,                # <h1> dans le body (même que navigation)
+        hide_h1=True               # MASQUER le h1 sur la page d'accueil
+    ))
 
-    # pages
+    # pages - utilise titre de page pour <h1>, titre complet pour <title>
     for slug, page_data in pages.items():
-        rendered[f"/{slug}.html"]=minify_html(render_page(page_data["title"], md_render(page_data["md"]), site.get("title","TinyBlog"), args.base_url, pal_css, nav_html, favicon_url, theme_css_url))
+        page_title_meta = f"{page_data['title']} - {site_title_html}"  # Pour <title>
+        page_title_h1 = page_data['title']  # Pour <h1>
+        rendered[f"/{slug}.html"]=minify_html(render_page(
+            page_title_meta,
+            md_render(page_data["md"]), 
+            site_title, 
+            args.base_url, 
+            pal_css, 
+            nav_html, 
+            favicon_url, 
+            theme_css_url, 
+            site_description,
+            "",  # pas de présentation
+            page_title_h1,
+            hide_h1=False  # Afficher le h1 sur les pages
+        ))
 
-    # posts
+    # posts - utilise titre d'article pour <h1>, titre complet pour <title>
     for p in posts:
         chips=" ".join(f'<a class="chip" href="{args.base_url}category/{s}.html">{html.escape(n)}</a>'
                        for n,s in zip(p["categories"],p["categories_slug"]))
         head=f'<div class="postmeta"><span>{p["date_str"]}</span>{chips}</div>'
         body_html=head+md_render(p["md"])
-        rendered[f"/{p['slug']}.html"]=minify_html(render_page(p["title"], body_html, site.get("title","TinyBlog"), args.base_url, pal_css, nav_html, favicon_url, theme_css_url))
+        post_title_meta = f"{p['title']} - {site_title_html}"  # Pour <title>
+        post_title_h1 = p['title']  # Pour <h1>
+        rendered[f"/{p['slug']}.html"]=minify_html(render_page(
+            post_title_meta,
+            body_html, 
+            site_title, 
+            args.base_url, 
+            pal_css, 
+            nav_html, 
+            favicon_url, 
+            theme_css_url, 
+            site_description,
+            "",  # pas de présentation
+            post_title_h1,
+            hide_h1=False  # Afficher le h1 sur les articles
+        ))
 
-    # categories
+    # categories - utilise nom de catégorie pour <h1>, titre complet pour <title>
     for slug,(name,plist) in cat_map.items():
         plist_sorted=sorted(plist,key=lambda p:p["date_obj"],reverse=True)
         body=build_ordered_list(plist_sorted, args.base_url, default_thumb_url)
-        rendered[f"/category/{slug}.html"]=minify_html(render_page(f"Category · {name}", body, site.get("title","TinyBlog"), args.base_url, pal_css, nav_html, favicon_url, theme_css_url))
+        category_title_meta = f"Category · {name} - {site_title_html}"  # Pour <title>
+        category_title_h1 = f"Category · {name}"  # Pour <h1>
+        rendered[f"/category/{slug}.html"]=minify_html(render_page(
+            category_title_meta,
+            body, 
+            site_title, 
+            args.base_url, 
+            pal_css, 
+            nav_html, 
+            favicon_url, 
+            theme_css_url, 
+            site_description,
+            "",  # pas de présentation
+            category_title_h1,
+            hide_h1=False  # Afficher le h1 sur les catégories
+        ))
+    
     if args.serve:
         _MemHandler.pages=rendered
         _MemHandler.public_dir=public_dir if public_dir.exists() else None

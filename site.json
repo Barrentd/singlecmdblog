@@ -1,5 +1,6 @@
 {
   "title": "Mon Blog",
+  "site_title": "Mon Super Blog",
   "description": "Description du blog",
   "favicon": "assets/favicon.ico",
   "defaultThumbnail": "assets/default-thumb.png",
@@ -8,5 +9,11 @@
     "github": "https://github.com/moncompte",
     "twitter": "https://twitter.com/moncompte",
     "linkedin": "https://linkedin.com/in/moncompte"
+  },
+  "presentation": {
+    "enabled": true,
+    "title": "Bienvenue sur mon blog",
+    "text": "Découvrez mes articles sur le développement web, la technologie et mes réflexions personnelles. Je partage ici mes expériences et mes apprentissages.",
+    "photo": "assets/profile.png"
   }
 }
