@@ -10,8 +10,7 @@ out/
 *~
 
 # Content directory
-content/*
-!content/.gitkeep
+content/*.md
 
 # Environment files
 .env
