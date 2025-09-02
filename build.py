@@ -8,9 +8,18 @@
 # - Enforces 14 KB/page size cap on written files
 
 from __future__ import annotations
-from pathlib import Path
-import json, re, sys, argparse, html, time, datetime as dt, os, importlib.util, mimetypes, shutil
+
+import argparse
+import datetime as dt
+import html
+import importlib.util
+import json
+import mimetypes
+import re
+import shutil
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 
 # ===================== CLI =====================
 def parse_args():
@@ -32,6 +41,7 @@ def parse_args():
 def _markdown_engine():
     if importlib.util.find_spec("markdown"):
         import markdown  # type: ignore
+
         # Pas de codehilite/pymdownx.highlight -> laisser HLJS faire la coloration
         exts = ["extra","sane_lists","smarty","toc"]
         for name in ("pymdownx.tasklist","pymdownx.tilde","pymdownx.caret","pymdownx.emoji",
@@ -290,6 +300,29 @@ def build_presentation_section(presentation_config: dict, base_url: str) -> str:
     
     return "".join(html_parts)
 
+def minify_css(css: str) -> str:
+    """Minifie le CSS en supprimant les espaces inutiles et commentaires"""
+    # Supprimer les commentaires CSS /* ... */
+    css = re.sub(r'/\*.*?\*/', '', css, flags=re.DOTALL)
+    
+    # Supprimer les espaces autour des sélecteurs et propriétés
+    css = re.sub(r'\s*{\s*', '{', css)
+    css = re.sub(r'\s*}\s*', '}', css)
+    css = re.sub(r'\s*:\s*', ':', css)
+    css = re.sub(r'\s*;\s*', ';', css)
+    css = re.sub(r'\s*,\s*', ',', css)
+    
+    # Supprimer les espaces multiples et les retours à la ligne
+    css = re.sub(r'\s+', ' ', css)
+    
+    # Supprimer les espaces en début et fin
+    css = css.strip()
+    
+    # Supprimer les points-virgules avant les accolades fermantes
+    css = re.sub(r';}', '}', css)
+    
+    return css
+
 def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, palette_css:str, nav_html:str, favicon_url:str|None, theme_css_url:str|None, description:str|None=None, presentation_html:str="", page_h1:str="", hide_h1:bool=False)->str:
     favicon_tag = f'<link rel=icon href="{html.escape(favicon_url)}">' if favicon_url else ""
     theme_link = f'<link rel=stylesheet href="{html.escape(theme_css_url)}">' if theme_css_url else ""
@@ -312,6 +345,9 @@ def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, pale
         # Masquer le h1 si hide_h1 est True
         header_content = f'<h1 style="display:none;">{html.escape(h1_text)}</h1>' if hide_h1 else f'<h1>{html.escape(h1_text)}</h1>'
     
+    # Minifier le CSS de palette avant injection
+    minified_palette_css = minify_css(palette_css) if palette_css else ""
+    
     return (
         "<!doctype html><meta charset=utf-8>"
         f"<title>{html.escape(doc_title)}</title>"  # site_title pour SEO
@@ -324,7 +360,7 @@ def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, pale
         "<link href='https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Geist:wght@100..900&family=Ubuntu+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap' rel=stylesheet>"
         f"{theme_link}"
         f"<script>{THEME_BOOT_JS}</script>"
-        f"<style>{palette_css}</style>"
+        f"<style>{minified_palette_css}</style>"
         f"{nav_html}<main><header>{header_content}</header>"
         f"{body_html}<footer></footer></main>"
         "<script src=https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js></script>"
@@ -484,7 +520,7 @@ class _MemHandler(BaseHTTPRequestHandler):
 def generate_sitemap(site_url: str, posts: list, pages: dict, categories: dict, base_url: str) -> str:
     """Génère un sitemap.xml avec toutes les pages du site"""
     from urllib.parse import urljoin
-    
+
     # Nettoyer l'URL de base pour éviter les doubles slashes
     site_url = site_url.rstrip('/')
     
@@ -658,11 +694,14 @@ def build(args):
     if theme_rel:
         # URL publique
         theme_css_url = args.base_url.rstrip("/") + "/assets/" + theme_rel
-        # Auto-génération si manquant (écrit BASE_CSS)
+        # Auto-génération si manquant (écrit BASE_CSS minifié)
         css_fs = public_dir / theme_rel
         if not css_fs.exists():
             css_fs.parent.mkdir(parents=True, exist_ok=True)
-            css_fs.write_text(BASE_CSS, encoding="utf-8")
+            # Minifier le CSS de base avant l'écriture
+            minified_base_css = minify_css(BASE_CSS)
+            css_fs.write_text(minified_base_css, encoding="utf-8")
+            print(f"[GEN]  Generated minified theme CSS: {css_fs}")
 
     posts, pages = collect_entries(content_dir)
     posts.sort(key=lambda p:p["date_obj"], reverse=True)
@@ -809,7 +848,15 @@ def build(args):
                 rel=src.relative_to(public_dir)
                 dst=out_dir/"assets"/rel
                 dst.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src,dst)
+                
+                # Minifier les fichiers CSS lors de la copie
+                if src.suffix.lower() == '.css':
+                    css_content = src.read_text(encoding="utf-8")
+                    minified_css = minify_css(css_content)
+                    dst.write_text(minified_css, encoding="utf-8")
+                    print(f"[MIN]  Minified CSS: {rel}")
+                else:
+                    shutil.copy2(src,dst)
     print(f"[DONE] {len(posts)} post(s), {len(cat_map)} category page(s) + index @ {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
 def build_social_links(social_config: dict, base_url: str) -> str:
