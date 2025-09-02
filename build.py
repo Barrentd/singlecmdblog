@@ -384,10 +384,12 @@ def collect_entries(content_dir:Path):
         date_str = date_obj.strftime("%Y-%m-%d")
         cats = meta.get("categories") or []
         thumbnail = meta.get("thumbnail", "")
+        # Nouveau: support pour thumbnail_on_article
+        thumbnail_on_article = str(meta.get("thumbnail_on_article", "")).lower() in ("true", "1", "yes")
         entry = {"slug":f.stem,"title":title,"subtitle":subtitle,"md":body,
                  "categories":cats,"categories_slug":[slugify(c) for c in cats],
                  "excerpt":excerpt_from_md(body),"date_obj":date_obj,"date_str":date_str,
-                 "thumbnail":thumbnail}
+                 "thumbnail":thumbnail,"thumbnail_on_article":thumbnail_on_article}
         if is_page:
             pages[f.stem.lower()] = entry
         else:
@@ -720,7 +722,15 @@ def build(args):
         chips=" ".join(f'<a class="chip" href="{args.base_url}category/{s}.html">{html.escape(n)}</a>'
                        for n,s in zip(p["categories"],p["categories_slug"]))
         head=f'<div class="postmeta"><span>{p["date_str"]}</span>{chips}</div>'
-        body_html=head+md_render(p["md"])
+        
+        # Ajouter la miniature dans l'article si thumbnail_on_article est true
+        thumbnail_html = ""
+        if p.get("thumbnail_on_article") and p.get("thumbnail"):
+            img_url = make_asset_url(p["thumbnail"], args.base_url)
+            if img_url:
+                thumbnail_html = f'<div class="article-thumbnail"><img src="{html.escape(img_url)}" alt="Thumbnail for {html.escape(p["title"])}" loading="lazy"></div>'
+        
+        body_html=head+thumbnail_html+md_render(p["md"])
         post_title_meta = f"{p['title']} - {site_title_html}"  # Pour <title>
         post_title_h1 = p['title']  # Pour <h1>
         rendered[f"/{p['slug']}.html"]=minify_html(render_page(

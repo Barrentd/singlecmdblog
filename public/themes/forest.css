@@ -625,6 +625,27 @@ header h1 {
     margin: 0;
 }
 
+.article-thumbnail {
+    margin: 1.5rem 0;
+    text-align: center;
+}
+
+.article-thumbnail img {
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--card-border);
+    object-fit: cover;
+    aspect-ratio: 16/9;
+    width: 100%;
+}
+
+
+@media (max-width: 600px) {
+    .article-thumbnail {
+        margin: 1rem 0;
+    }
+}
+
 @media (max-width: 600px) {
     .presentation-photo {
         width: 100px;

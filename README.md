@@ -1,52 +1,58 @@
-# Tinyblog
+# SingleCmdBlog
 
-*Because WordPress is for people who enjoy suffering*
+> Write it, build it, ship it
 
 ## What is this?
 
-TinyBlog is a ridiculously simple static blog generator that fits in a single Python file. No databases, no PHP nightmares, no "oops I broke my site by updating a plugin" moments.
+SingleCmdBlog is a ridiculously simple static blog generator that fits in a single Python file. No databases, no PHP nightmares, no "oops I broke my site by updating a plugin" moments.
 
 **Features:**
-- ✅ Write in Markdown (like a civilized human)
-- ✅ Dark/Light theme toggle
-- ✅ Categories
-- ✅ Mobile-friendly (your mom can read it on her phone)
-- ✅ Fast as lightning ⚡ (14KB page limit enforced!)
-- ✅ Zero dependencies* (*well, Python... but that's it!)
+
+- Write in Markdown (like a civilized human)
+- Dark/Light theme toggle
+- Categories
+- Mobile-friendly (your mom can read it on her phone)
+- Fast as lightning ⚡ (14KB page limit enforced!)
+- Zero dependencies (well, Python... but that's it!)
 
 ## Quick Start
 
 **The "I want it NOW" way:**
 
-```bash
-# 1. Write some content
-echo '---
+### 1. Write some content in content/my-first-post.md
+
+```markdown
+---
 title: My First Post
 date: 2024-01-01
 categories: blog, thoughts
 ---
 
-# Hello World!
+This is easier than assembling IKEA furniture.
+```
 
-This is easier than assembling IKEA furniture.' > content/my-first-post.md
+### 2. Build the site
 
-# 2. Build the site
+```bash
 python3 build.py
+```
 
-# 3. Serve it locally (because we live dangerously)
+### 3. Serve it locally (because we live dangerously)
+
+```bash
 python3 build.py --serve
 ```
 
-Open http://localhost:8000 and boom! 💥 You have a blog.
+Open http://localhost:8080 and boom 💥 You have a blog.
 
 ## Docker Way (for the cool kids)
 
 ```bash
 # Build the image
-docker build -f Dockerfile.test -t tinyblog .
+docker build -f Dockerfile.test -t singlecmdblog .
 
 # Run it (your blog will live at http://localhost:8080)
-docker run -p 8080:80 tinyblog
+docker run -p 8080:80 singlecmdblog
 
 # Feel superior to WordPress users
 ```
