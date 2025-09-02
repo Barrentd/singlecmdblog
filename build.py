@@ -190,6 +190,20 @@ NAV_JS = (
 "? 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css'"
 ": 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github.min.css');}"
 "function apply(t){rt.dataset.theme=t;setHLJSTheme(t);try{localStorage.setItem(KEY,t)}catch(e){}}"
+"function initUI(){"
+" setHLJSTheme(rt.dataset.theme||'light');"
+" var b=d.getElementById('themeToggle');if(b){b.textContent=(rt.dataset.theme==='dark'?'☀️':'🌙');"
+" b.onclick=function(){var v=(rt.dataset.theme==='dark'?'light':'dark');apply(v);b.textContent=(v==='dark'?'☀️':'🌙');}}"
+" var m=d.getElementById('menuToggle');if(m){m.onclick=function(){rt.classList.toggle('menu-open');}}"
+" var sel=d.getElementById('categorySelect');if(sel){sel.onchange=function(){if(sel.value)location.href=sel.value;}}"
+" requestAnimationFrame(function(){rt.removeAttribute('data-tb-init');});"
+"}"
+"if(d.readyState==='loading'){d.addEventListener('DOMContentLoaded',initUI);}else{initUI();}"
+"})();"
+)
+
+HLJS_JS = (
+"(function(){const d=document;"
 "function enhanceCode(){"
 " var idx=1;"
 " d.querySelectorAll('pre>code').forEach(function(code){"
@@ -232,16 +246,7 @@ NAV_JS = (
 "   cpy.appendChild(btn);wrap.appendChild(cpy);"
 " });"
 "}"
-"function initUI(){"
-" setHLJSTheme(rt.dataset.theme||'light');"
-" var b=d.getElementById('themeToggle');if(b){b.textContent=(rt.dataset.theme==='dark'?'☀️':'🌙');"
-" b.onclick=function(){var v=(rt.dataset.theme==='dark'?'light':'dark');apply(v);b.textContent=(v==='dark'?'☀️':'🌙');}}"
-" var m=d.getElementById('menuToggle');if(m){m.onclick=function(){rt.classList.toggle('menu-open');}}"
-" var sel=d.getElementById('categorySelect');if(sel){sel.onchange=function(){if(sel.value)location.href=sel.value;}}"
-" enhanceCode();"
-" requestAnimationFrame(function(){rt.removeAttribute('data-tb-init');});"
-"}"
-"if(d.readyState==='loading'){d.addEventListener('DOMContentLoaded',initUI);}else{initUI();}"
+"if(d.readyState==='loading'){d.addEventListener('DOMContentLoaded',enhanceCode);}else{enhanceCode();}"
 "})();"
 )
 
@@ -359,6 +364,7 @@ def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, pale
         f"{body_html}<footer></footer></main>"
         "<script src=https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js></script>"
         "<script>hljs.highlightAll();</script>"
+        # f"<script>{HLJS_JS}</script>"
         f"<script>{NAV_JS}</script>"
     )
 

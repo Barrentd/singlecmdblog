@@ -3,6 +3,7 @@
   "site_title": "Barrentd blog",
   "siteUrl": "https://barrentdblog.com",
   "description": "Description du blog",
+  "lang": "fr",
   "favicon": "assets/favicon.ico",
   "defaultThumbnail": "assets/default-thumb.png",
   "theme": "forest",
