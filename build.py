@@ -478,6 +478,134 @@ class _MemHandler(BaseHTTPRequestHandler):
         self.send_response(404); self.send_header("content-type","text/plain; charset=utf-8")
         self.end_headers(); self.wfile.write(b"404")
 
+# ===================== Sitemap generation =====================
+def generate_sitemap(site_url: str, posts: list, pages: dict, categories: dict, base_url: str) -> str:
+    """Génère un sitemap.xml avec toutes les pages du site"""
+    from urllib.parse import urljoin
+    
+    # Nettoyer l'URL de base pour éviter les doubles slashes
+    site_url = site_url.rstrip('/')
+    
+    entries = []
+    
+    # Page d'accueil - priorité la plus haute, mise à jour fréquente
+    entries.append({
+        'loc': site_url + base_url.rstrip('/') + '/',
+        'lastmod': posts[0]['date_obj'].strftime('%Y-%m-%d') if posts else None,
+        'changefreq': 'daily',
+        'priority': '1.0'
+    })
+    
+    # Posts - priorité haute, changement occasionnel
+    for post in posts:
+        entries.append({
+            'loc': f"{site_url}{base_url.rstrip('/')}/{post['slug']}.html",
+            'lastmod': post['date_obj'].strftime('%Y-%m-%d'),
+            'changefreq': 'monthly',
+            'priority': '0.8'
+        })
+    
+    # Pages statiques - priorité moyenne, changement rare
+    for slug, page_data in pages.items():
+        entries.append({
+            'loc': f"{site_url}{base_url.rstrip('/')}/{slug}.html",
+            'lastmod': page_data['date_obj'].strftime('%Y-%m-%d'),
+            'changefreq': 'yearly',
+            'priority': '0.6'
+        })
+    
+    # Pages de catégories - priorité basse, changement avec nouveaux posts
+    for cat_slug, (cat_name, cat_posts) in categories.items():
+        if cat_posts:  # Seulement si la catégorie a des posts
+            # Date du post le plus récent dans cette catégorie
+            latest_post = max(cat_posts, key=lambda p: p['date_obj'])
+            entries.append({
+                'loc': f"{site_url}{base_url.rstrip('/')}/category/{cat_slug}.html",
+                'lastmod': latest_post['date_obj'].strftime('%Y-%m-%d'),
+                'changefreq': 'weekly',
+                'priority': '0.4'
+            })
+    
+    # Génération du XML
+    xml_lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+    ]
+    
+    for entry in entries:
+        xml_lines.append('  <url>')
+        xml_lines.append(f'    <loc>{html.escape(entry["loc"])}</loc>')
+        
+        if entry.get('lastmod'):
+            xml_lines.append(f'    <lastmod>{entry["lastmod"]}</lastmod>')
+        
+        if entry.get('changefreq'):
+            xml_lines.append(f'    <changefreq>{entry["changefreq"]}</changefreq>')
+        
+        if entry.get('priority'):
+            xml_lines.append(f'    <priority>{entry["priority"]}</priority>')
+        
+        xml_lines.append('  </url>')
+    
+    xml_lines.append('</urlset>')
+    
+    return '\n'.join(xml_lines)
+
+# ===================== Robots.txt generation =====================
+def generate_robots_txt(robots_config: dict, site_url: str, base_url: str) -> str:
+    """Génère un fichier robots.txt à partir de la configuration"""
+    if not robots_config:
+        # Configuration par défaut
+        lines = [
+            "User-agent: *",
+            "Allow: /",
+            "",
+            f"Sitemap: {site_url.rstrip('/')}{base_url.rstrip('/')}/sitemap.xml"
+        ]
+        return "\n".join(lines)
+    
+    lines = []
+    
+    # User-Agent
+    user_agent = robots_config.get("userAgent", "*")
+    lines.append(f"User-agent: {user_agent}")
+    
+    # Allow rules
+    allow_rules = robots_config.get("allow", [])
+    if isinstance(allow_rules, str):
+        allow_rules = [allow_rules]
+    for rule in allow_rules:
+        lines.append(f"Allow: {rule}")
+    
+    # Disallow rules
+    disallow_rules = robots_config.get("disallow", [])
+    if isinstance(disallow_rules, str):
+        disallow_rules = [disallow_rules]
+    for rule in disallow_rules:
+        lines.append(f"Disallow: {rule}")
+    
+    # Crawl-delay si spécifié
+    if "crawlDelay" in robots_config:
+        lines.append(f"Crawl-delay: {robots_config['crawlDelay']}")
+    
+    # Ligne vide avant le sitemap
+    if lines:
+        lines.append("")
+    
+    # Sitemap
+    include_sitemap = robots_config.get("sitemap", True)
+    if include_sitemap and site_url:
+        lines.append(f"Sitemap: {site_url.rstrip('/')}{base_url.rstrip('/')}/sitemap.xml")
+    
+    # Commentaires personnalisés
+    comments = robots_config.get("comments", [])
+    if isinstance(comments, str):
+        comments = [comments]
+    for comment in comments:
+        lines.insert(0, f"# {comment}")
+    
+    return "\n".join(lines)
+
 # ===================== Build =====================
 def build(args):
     root=Path.cwd()
@@ -488,6 +616,7 @@ def build(args):
     site_description = site.get("description", "")
     site_title = site.get("title", "TinyBlog")
     site_title_html = site.get("site_title", site_title)
+    site_url = site.get("siteUrl", "")  # Nouvelle variable pour le sitemap
     
     # Génération de la section présentation
     presentation_html = build_presentation_section(site.get("presentation", {}), args.base_url)
@@ -645,6 +774,23 @@ def build(args):
         out_file.parent.mkdir(parents=True, exist_ok=True)
         out_file.write_text(html_doc, encoding="utf-8")
         bytes_ok(out_file, args.max_bytes)
+    
+    # Génération du sitemap.xml si siteUrl est définie
+    if site_url:
+        sitemap_xml = generate_sitemap(site_url, posts, pages, cat_map, args.base_url)
+        sitemap_file = out_dir / "sitemap.xml"
+        sitemap_file.write_text(sitemap_xml, encoding="utf-8")
+        print(f"[OK]   sitemap.xml generated with {len(posts) + len(pages) + len(cat_map) + 1} URLs")
+    else:
+        print("[SKIP] sitemap.xml - no siteUrl defined in site.json")
+    
+    # Génération du robots.txt
+    robots_config = site.get("robotsTxt", {})
+    robots_txt = generate_robots_txt(robots_config, site_url, args.base_url)
+    robots_file = out_dir / "robots.txt"
+    robots_file.write_text(robots_txt, encoding="utf-8")
+    print(f"[OK]   robots.txt generated")
+    
     # Toujours créer le dossier assets (même s'il n'y a rien à copier)
     (out_dir/"assets").mkdir(parents=True, exist_ok=True)
     if public_dir.exists():

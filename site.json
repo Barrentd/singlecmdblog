@@ -6,6 +6,12 @@
   "favicon": "assets/favicon.ico",
   "defaultThumbnail": "assets/default-thumb.png",
   "theme": "default",
+  "robotsTxt": {
+    "userAgent": "*",
+    "allow": "/",
+    "disallow": ["/admin/", "/private/"],
+    "sitemap": true
+  },
   "social": {
     "github": "https://github.com/moncompte",
     "twitter": "https://twitter.com/moncompte",
