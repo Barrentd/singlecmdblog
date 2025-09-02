@@ -322,7 +322,7 @@ def minify_css(css: str) -> str:
     
     return css
 
-def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, palette_css:str, nav_html:str, favicon_url:str|None, theme_css_url:str|None, description:str|None=None, presentation_html:str="", page_h1:str="", hide_h1:bool=False)->str:
+def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, palette_css:str, nav_html:str, favicon_url:str|None, theme_css_url:str|None, description:str|None=None, presentation_html:str="", page_h1:str="", hide_h1:bool=False, lang:str="en")->str:
     favicon_tag = f'<link rel=icon href="{html.escape(favicon_url)}">' if favicon_url else ""
     theme_link = f'<link rel=stylesheet href="{html.escape(theme_css_url)}">' if theme_css_url else ""
     description_tag = f'<meta name=description content="{html.escape(description)}">' if description else ""
@@ -348,7 +348,7 @@ def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, pale
     minified_palette_css = minify_css(palette_css) if palette_css else ""
     
     return (
-        "<!doctype html><meta charset=utf-8>"
+        f"<!doctype html><html lang='{html.escape(lang)}'><head><meta charset=utf-8>"
         f"<title>{html.escape(doc_title)}</title>"  # site_title pour SEO
         f"{description_tag}"
         "<meta name=viewport content='width=device-width,initial-scale=1'>"
@@ -654,6 +654,7 @@ def build(args):
     site_title = site.get("title", "TinyBlog")
     site_title_html = site.get("site_title", site_title)
     site_url = site.get("siteUrl", "")  # Nouvelle variable pour le sitemap
+    site_lang = site.get("lang", "en")  # Langue du site, par défaut 'en'
     
     # Génération de la section présentation
     presentation_html = build_presentation_section(site.get("presentation", {}), args.base_url)
@@ -733,7 +734,8 @@ def build(args):
         site_description, 
         presentation_html,
         site_title,                # <h1> dans le body (même que navigation)
-        hide_h1=True               # MASQUER le h1 sur la page d'accueil
+        hide_h1=True,              # MASQUER le h1 sur la page d'accueil
+        lang=site_lang
     ))
 
     # pages - utilise titre de page pour <h1>, titre complet pour <title>
@@ -752,7 +754,8 @@ def build(args):
             site_description,
             "",  # pas de présentation
             page_title_h1,
-            hide_h1=False  # Afficher le h1 sur les pages
+            hide_h1=False,  # Afficher le h1 sur les pages
+            lang=site_lang
         ))
 
     # posts - utilise titre d'article pour <h1>, titre complet pour <title>
@@ -783,7 +786,8 @@ def build(args):
             site_description,
             "",  # pas de présentation
             post_title_h1,
-            hide_h1=False  # Afficher le h1 sur les articles
+            hide_h1=False,  # Afficher le h1 sur les articles
+            lang=site_lang
         ))
 
     # categories - utilise nom de catégorie pour <h1>, titre complet pour <title>
@@ -806,7 +810,7 @@ def build(args):
             category_title_h1,
             hide_h1=False  # Afficher le h1 sur les catégories
         ))
-    
+
     if args.serve:
         _MemHandler.pages=rendered
         _MemHandler.public_dir=public_dir if public_dir.exists() else None
