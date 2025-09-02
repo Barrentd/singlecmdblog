@@ -301,25 +301,19 @@ def build_presentation_section(presentation_config: dict, base_url: str) -> str:
     return "".join(html_parts)
 
 def minify_css(css: str) -> str:
-    """Minifie le CSS en supprimant les espaces inutiles et commentaires"""
-    # Supprimer les commentaires CSS /* ... */
+    """Minifie le CSS de manière plus agressive"""
+    # Supprimer les commentaires CSS
     css = re.sub(r'/\*.*?\*/', '', css, flags=re.DOTALL)
     
-    # Supprimer les espaces autour des sélecteurs et propriétés
-    css = re.sub(r'\s*{\s*', '{', css)
-    css = re.sub(r'\s*}\s*', '}', css)
-    css = re.sub(r'\s*:\s*', ':', css)
-    css = re.sub(r'\s*;\s*', ';', css)
-    css = re.sub(r'\s*,\s*', ',', css)
+    # Supprimer les espaces inutiles
+    css = re.sub(r'\s*([{}:;,])\s*', r'\1', css)
+    css = re.sub(r';\s*}', '}', css)  # Supprimer ; avant }
+    css = re.sub(r'\s+', ' ', css)    # Espaces multiples → un seul
+    css = re.sub(r'^\s+|\s+$', '', css)  # Trim début/fin
     
-    # Supprimer les espaces multiples et les retours à la ligne
-    css = re.sub(r'\s+', ' ', css)
-    
-    # Supprimer les espaces en début et fin
-    css = css.strip()
-    
-    # Supprimer les points-virgules avant les accolades fermantes
-    css = re.sub(r';}', '}', css)
+    # Optimisations supplémentaires
+    css = re.sub(r'0\.(\d+)', r'.\1', css)    # 0.5 → .5
+    css = re.sub(r':0(px|em|rem|%)', ':0', css)  # Supprimer unités de 0
     
     return css
 
@@ -471,27 +465,26 @@ def build_ordered_list(items, base_url:str, default_thumb_url:str|None=None)->st
     
     return '<ol class="postlist">'+"".join(cards)+"</ol>"
 
-def bytes_ok(path:Path, limit:int):
-    size=path.stat().st_size
+def bytes_ok(path: Path, limit: int):
+    size = path.stat().st_size
     
-    # Règles spécifiques selon le type de fichier
+    # Limites recommandées par type
+    limits = {
+        "index.html": 14 * 1024,
+        "article": 30 * 1024,
+        "default": limit
+    }
+    
     if path.name == "index.html":
-        if size > 14*1024:  # 14KB
-            print(f"[WARN] {path.name} = {size} bytes > 14KB (recommended size exceeded)")
-        else:
-            print(f"[OK]   {path.name} = {size} bytes")
+        threshold = limits["index.html"]
     elif path.name.endswith(".html") and path.parent.name != "category":
-        # Articles individuels (posts et pages, mais pas les catégories)
-        if size > 30*1024:  # 30KB
-            print(f"[WARN] {path.name} = {size} bytes > 30KB (recommended size exceeded)")
-        else:
-            print(f"[OK]   {path.name} = {size} bytes")
+        threshold = limits["article"]
     else:
-        # Pour tous les autres fichiers (catégories, etc.), garder la limite globale mais en warning
-        if size > limit:
-            print(f"[WARN] {path.name} = {size} bytes > {limit} bytes (recommended size exceeded)")
-        else:
-            print(f"[OK]   {path.name} = {size} bytes")
+        threshold = limits["default"]
+    
+    status = "OK" if size <= threshold else "WARN"
+    print(f"[{status}] {path.name} = {size} bytes" + 
+          (f" > {threshold} bytes (recommended size exceeded)" if status == "WARN" else ""))
 
 # ===================== In-memory server =====================
 class _MemHandler(BaseHTTPRequestHandler):
