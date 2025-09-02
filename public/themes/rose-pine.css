@@ -574,7 +574,6 @@ html[data-theme=light] .social-icon {
 
 /* Presentation section intégrée dans le header */
 .header-content {
-    text-align: center;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -582,9 +581,16 @@ html[data-theme=light] .social-icon {
 }
 
 .presentation {
+    text-align: center;
     margin: 0;
     padding: 0;
     border: none;
+    display: flex;
+    flex-direction: column;
+    align-content: center;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
 }
 
 .presentation-photo {
@@ -594,7 +600,7 @@ html[data-theme=light] .social-icon {
     object-fit: cover;
     margin: 0;
     display: block;
-    border: 3px solid var(--card-border);
+    border: 3px solid var(--bg);
 }
 
 .presentation-title {

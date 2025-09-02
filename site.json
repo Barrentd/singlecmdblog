@@ -1,6 +1,7 @@
 {
-  "title": "Mon Blog",
-  "site_title": "Mon Super Blog",
+  "title": "Barrentd blog",
+  "site_title": "Barrentd blog",
+  "siteUrl": "https://barrentdblog.com",
   "description": "Description du blog",
   "favicon": "assets/favicon.ico",
   "defaultThumbnail": "assets/default-thumb.png",
