@@ -297,12 +297,12 @@ def build_presentation_section(presentation_config: dict, base_url: str) -> str:
     
     # Titre de présentation (sous le h1 principal)
     if title:
-        html_parts.append(f'<h2 class="presentation-title">{html.escape(title)}</h2>')
+        html_parts.append(f'<h1 class="presentation-title">{html.escape(title)}</h1>')
     
     # Texte
     if text:
-        html_parts.append(f'<p class="presentation-text">{html.escape(text)}</p>')
-    
+        html_parts.append(f'<h2 class="presentation-text">{html.escape(text)}</h2>')
+
     return "".join(html_parts)
 
 def minify_css(css: str) -> str:
@@ -333,10 +333,10 @@ def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, pale
     # Si on a du contenu de présentation, on l'intègre dans le header
     if presentation_html:
         # Masquer le h1 si hide_h1 est True
-        h1_element = f'<h1 style="display:none;">{html.escape(h1_text)}</h1>' if hide_h1 else f'<h1>{html.escape(h1_text)}</h1>'
+        # h1_element = f'<h1 style="display:none;">{html.escape(h1_text)}</h1>' if hide_h1 else f'<h1>{html.escape(h1_text)}</h1>'
         header_content = (
             f'<div class="header-content">'
-            f'{h1_element}'
+            # f'{h1_element}'
             f'<div class="presentation">{presentation_html}</div>'
             f'</div>'
         )
@@ -409,6 +409,11 @@ def excerpt_from_md(md:str, limit:int=160)->str:
 def collect_entries(content_dir:Path):
     posts, pages = [], {}
     for f in sorted(content_dir.glob("*.md")):
+        
+        if f.stem.lower() in ("example", "exemple", "_example", "_exemple"):
+            print(f"[SKIP] Ignoring example file: {f.name}")
+            continue        
+        
         raw=f.read_text(encoding="utf-8").strip()
         meta, body = parse_front_matter(raw)
         title = meta.get("title") or (body.splitlines()[0].lstrip("# ").strip() if body else f.stem) or f.stem
