@@ -828,7 +828,7 @@ def build(args):
     
     # index - SANS minification
     idx_body = build_ordered_list(posts, args.base_url, default_thumb_url)
-    rendered["/index.html"] = render_page(
+    rendered["/index.html"] = minify_html(render_page(
         site_title_html,
         idx_body,
         site_title,
@@ -841,13 +841,13 @@ def build(args):
         presentation_html,
         site_title,
         lang=site_lang
-    )
+    ))
 
     # pages - SANS minification
     for slug, page_data in pages.items():
         page_title_meta = f"{page_data['title']} - {site_title_html}"
         page_title_h1 = page_data['title']
-        rendered[f"/{slug}.html"] = render_page(
+        rendered[f"/{slug}.html"] = minify_html(render_page(
             page_title_meta,
             md_render(page_data["md"]), 
             site_title, 
@@ -860,7 +860,7 @@ def build(args):
             "",
             page_title_h1,
             lang=site_lang
-        )
+        ))
 
     # posts - SANS minification
     for p in posts:
@@ -886,7 +886,7 @@ def build(args):
         body_html = head + thumbnail_html + md_render(p["md"])
         post_title_meta = f"{p['title']} - {site_title_html}"
         post_title_h1 = p['title']
-        rendered[f"/{p['slug']}.html"] = render_page(
+        rendered[f"/{p['slug']}.html"] = minify_html(render_page(
             post_title_meta,
             body_html, 
             site_title, 
@@ -899,7 +899,7 @@ def build(args):
             "",
             post_title_h1,
             lang=site_lang
-        )
+        ))
 
     # categories - SANS minification
     for slug, (name, plist) in cat_map.items():
@@ -907,7 +907,7 @@ def build(args):
         body = build_ordered_list(plist_sorted, args.base_url, default_thumb_url)
         category_title_meta = f"Category · {name} - {site_title_html}"
         category_title_h1 = f"Category · {name}"
-        rendered[f"/category/{slug}.html"] = render_page(
+        rendered[f"/category/{slug}.html"] = minify_html(render_page(
             category_title_meta,
             body, 
             site_title, 
@@ -919,7 +919,7 @@ def build(args):
             site_description,
             "",
             category_title_h1
-        )
+        ))
 
     if args.serve:
         _MemHandler.pages=rendered
