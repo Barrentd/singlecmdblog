@@ -1,5 +1,5 @@
 {
-  "title": "Mon Blog",
+  "title": "My awesome Blog",
   "site_title": "Barrentd blog",
   "siteUrl": "https://barrentdblog.com",
   "description": "Description du blog",
@@ -25,7 +25,7 @@
     "photo": "assets/profile.png"
   },
   "webp": {
-    "enabled": false,
+    "enabled": true,
     "quality": 85,
     "keepOriginals": false
   }

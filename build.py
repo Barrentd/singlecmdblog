@@ -50,84 +50,44 @@ def parse_args():
 
 # ===================== Markdown engines =====================
 def _markdown_engine():
+    # Try full engine (python-markdown + pymdown-extensions)
     if importlib.util.find_spec("markdown"):
+        print("[DEBUG] Markdown engine = FULL")
         import markdown  # type: ignore
 
-        # Pas de codehilite/pymdownx.highlight -> laisser HLJS faire la coloration
-        exts = ["extra","sane_lists","smarty","toc"]
-        for name in ("pymdownx.tasklist","pymdownx.tilde","pymdownx.caret","pymdownx.emoji",
-                     "pymdownx.superfences"):
-            if importlib.util.find_spec(name): exts.append(name)
-        md = markdown.Markdown(extensions=exts, extension_configs={
-            "pymdownx.tasklist":{"custom_checkbox":True,"clickable_checkbox":False},
-        })
-        return lambda text: md.reset().convert(text)
+        # No codehilite: highlighting is done by HLJS on the client
+        exts = ["extra", "sane_lists", "smarty", "toc", "admonition"]
+        for ext_name in (
+            "pymdownx.tasklist",
+            "pymdownx.tilde",
+            "pymdownx.caret",
+            "pymdownx.emoji",
+            "pymdownx.superfences",
+            "pymdownx.tabbed",  # tabs/onglets
+        ):
+            if importlib.util.find_spec(ext_name):
+                print(f"[DEBUG] Found extension: {ext_name}")
+                exts.append(ext_name)
 
-    # fallback mini parser: titres, hr, paragraphes, inline, fenced code ```
-    def _mini(text:str)->str:
-        lines=text.splitlines()
-        out:list[str]=[]
-        buf:list[str]=[]
-        in_code=False
-        code_lang=""
-        code_buf:list[str]=[]
+        print(f"[DEBUG] Extensions: {exts}")
+        md = markdown.Markdown(
+            extensions=exts,
+            extension_configs={
+                "pymdownx.tasklist": {"custom_checkbox": True, "clickable_checkbox": False},
+                # Safe: ignored if pymdownx.tabbed not loaded
+                "pymdownx.tabbed": {"alternate_style": True},
+            },
+            output_format="html",
+        )
 
-        def flush_p():
-            nonlocal buf
-            if not buf: return
-            t=" ".join(buf).strip()
-            if t:
-                # t est déjà échappé (voir plus bas)
-                t=re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t)
-                t=re.sub(r"\*(.+?)\*", r"<i>\1</i>", t)
-                # ne pas ré-échapper à l'intérieur
-                t=re.sub(r"`(.+?)`", r"<code>\1</code>", t)
-                t=re.sub(r"!\[([^\]]*)\]\(([^)]+)\)", r'<img alt="\1" src="\2">', t)
-                t=re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', t)
-                out.append(f"<p>{t}</p>")
-            buf=[]
+        def render_with_debug(text: str) -> str:
+            print(f"[DEBUG] Input markdown length: {len(text)}")
+            result = md.reset().convert(text)
+            print(f"[DEBUG] Output HTML length: {len(result)}")
+            print(f"[DEBUG] First 200 chars of HTML: {result[:200]}")
+            return result
 
-        for raw in lines:
-            l=raw.rstrip("\n")
-            ls=l.strip()
-
-            if in_code:
-                if ls.startswith("```"):
-                    code_html=html.escape("\n".join(code_buf))
-                    cls=f' class="language-{code_lang}"' if code_lang else ""
-                    out.append(f"<pre><code{cls}>{code_html}</code></pre>")
-                    in_code=False; code_lang=""; code_buf=[]
-                else:
-                    code_buf.append(l)
-                continue
-
-            if ls.startswith("```"):
-                flush_p()
-                code_lang=ls[3:].strip().lower()
-                in_code=True; code_buf=[]
-                continue
-
-            if not ls:
-                flush_p(); continue
-
-            if l.startswith("# "):
-                flush_p(); out.append(f"<h1>{html.escape(l[2:].strip())}</h1>"); continue
-            if l.startswith("## "):
-                flush_p(); out.append(f"<h2>{html.escape(l[3:].strip())}</h2>"); continue
-            if ls=="---":
-                flush_p(); out.append("<hr>"); continue
-
-            # stocker déjà échappé pour éviter toute injection
-            buf.append(html.escape(l))
-
-        flush_p()
-        if in_code:
-            code_html=html.escape("\n".join(code_buf))
-            cls=f' class="language-{code_lang}"' if code_lang else ""
-            out.append(f"<pre><code{cls}>{code_html}</code></pre>")
-        return "".join(out)
-
-    return _mini
+        return render_with_debug
 
 md_render=_markdown_engine()
 
@@ -327,58 +287,73 @@ def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, pale
     theme_link = f'<link rel=stylesheet href="{html.escape(theme_css_url)}">' if theme_css_url else ""
     description_tag = f'<meta name=description content="{html.escape(description)}">' if description else ""
     
-    # Utiliser page_h1 pour le h1 dans le body, ou fallback sur doc_title
     h1_text = page_h1 if page_h1 else doc_title
     
-    # Si on a du contenu de présentation, on l'intègre dans le header
     if presentation_html:
         header_content = (
             f'<div class="header-content">'
-            # f'{h1_element}'
             f'<div class="presentation">{presentation_html}</div>'
             f'</div>'
             f'<h2>All posts</h2>'
         )
     else:
-        header_content = '<h1>All posts</h1>'
-    
-    # Minifier le CSS de palette avant injection
-    minified_palette_css = minify_css(palette_css) if palette_css else ""
-    
-    return (
-        f"<!doctype html><html lang='{html.escape(lang)}'><head><meta charset=utf-8>"
-        f"<title>{html.escape(doc_title)}</title>"  # site_title pour SEO
-        f"{description_tag}"
-        "<meta name=viewport content='width=device-width,initial-scale=1'>"
-        "<meta name=generator content=TinyBlog>"
-        f"{favicon_tag}"
-        "<link rel=preconnect href=https://fonts.googleapis.com>"
-        "<link rel=preconnect href=https://fonts.gstatic.com crossorigin>"
-        "<link href='https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Geist:wght@100..900&family=Ubuntu+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap' rel=stylesheet>"
-        f"{theme_link}"
-        f"<script>{THEME_BOOT_JS}</script>"
-        f"<style>{minified_palette_css}</style>"
-        f"{nav_html}<main><header>{header_content}</header>"
-        f"{body_html}<footer></footer></main>"
-        "<script src=https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js></script>"
-        "<script>hljs.highlightAll();</script>"
-        # f"<script>{HLJS_JS}</script>"
-        f"<script>{NAV_JS}</script>"
-    )
+        header_content = f'<h1>{h1_text}</h1>'
 
-def minify_html(s:str)->str:
+    # PAS de minification du CSS non plus
+    css_content = palette_css if palette_css else ""
+    
+    # Template avec des retours à la ligne pour debug
+    return f"""<!doctype html>
+<html lang='{html.escape(lang)}'>
+<head>
+    <meta charset=utf-8>
+    <title>{html.escape(doc_title)}</title>
+    {description_tag}
+    <meta name=viewport content='width=device-width,initial-scale=1'>
+    <meta name=generator content=TinyBlog>
+    {favicon_tag}
+    <link rel=preconnect href=https://fonts.googleapis.com>
+    <link rel=preconnect href=https://fonts.gstatic.com crossorigin>
+    <link href='https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Geist:wght@100..900&family=Ubuntu+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap' rel=stylesheet>
+    {theme_link}
+    <script>{THEME_BOOT_JS}</script>
+    <style>{css_content}</style>
+</head>
+<body>
+    {nav_html}
+    <main>
+        <header>{header_content}</header>
+        {body_html}
+        <footer></footer>
+    </main>
+    <script src=https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js></script>
+    <script>hljs.highlightAll();</script>
+    <script>{HLJS_JS}</script>
+    <script>{NAV_JS}</script>
+</body>
+</html>"""
+
+def minify_html(s: str, enable_minify: bool = True) -> str:
+    """Minifie le HTML en préservant le contenu sensible aux espaces"""
+    if not enable_minify:
+        return s
+    
     # Protéger le contenu sensible aux espaces
-    keep:list[str]=[]
+    keep: list[str] = []
     def stash(m):
         keep.append(m.group(0))
         return f"<!--__TB_KEEP_{len(keep)-1}__-->"
-    # préserve <pre>, <code>, <textarea>, <script>, <style>
+    
+    # Préserver <pre>, <code>, <textarea>, <script>, <style>
     s = re.sub(r"(?is)<(pre|code|textarea|script|style)\b.*?>.*?</\1>", stash, s)
+    
     # Minification sûre (entre balises uniquement)
     s = re.sub(r">\s+<", "><", s).strip()
-    # Restaurer
-    for i,blk in enumerate(keep):
+    
+    # Restaurer le contenu protégé
+    for i, blk in enumerate(keep):
         s = s.replace(f"<!--__TB_KEEP_{i}__-->", blk)
+    
     return s
 
 # ===================== Helpers =====================
@@ -851,10 +826,10 @@ def build(args):
     
     rendered={}
     
-    # index - avec présentation, masque le h1
-    idx_body=build_ordered_list(posts, args.base_url, default_thumb_url)
-    rendered["/index.html"]=minify_html(render_page(
-        site_title_html,           # <title> dans le head
+    # index - SANS minification
+    idx_body = build_ordered_list(posts, args.base_url, default_thumb_url)
+    rendered["/index.html"] = render_page(
+        site_title_html,
         idx_body,
         site_title,
         args.base_url,
@@ -864,15 +839,15 @@ def build(args):
         theme_css_url,
         site_description,
         presentation_html,
-        site_title, # <h1> dans le body (même que navigation)
+        site_title,
         lang=site_lang
-    ))
+    )
 
-    # pages - utilise titre de page pour <h1>, titre complet pour <title>
+    # pages - SANS minification
     for slug, page_data in pages.items():
-        page_title_meta = f"{page_data['title']} - {site_title_html}"  # Pour <title>
-        page_title_h1 = page_data['title']  # Pour <h1>
-        rendered[f"/{slug}.html"]=minify_html(render_page(
+        page_title_meta = f"{page_data['title']} - {site_title_html}"
+        page_title_h1 = page_data['title']
+        rendered[f"/{slug}.html"] = render_page(
             page_title_meta,
             md_render(page_data["md"]), 
             site_title, 
@@ -882,17 +857,16 @@ def build(args):
             favicon_url, 
             theme_css_url, 
             site_description,
-            "",  # pas de présentation
+            "",
             page_title_h1,
             lang=site_lang
-        ))
+        )
 
-    # posts - utilise titre d'article pour <h1>, titre complet pour <title>
+    # posts - SANS minification
     for p in posts:
-        chips=" ".join(f'<a class="chip" href="{args.base_url}category/{s}.html">{html.escape(n)}</a>'
-                       for n,s in zip(p["categories"],p["categories_slug"]))
+        chips = " ".join(f'<a class="chip" href="{args.base_url}category/{s}.html">{html.escape(n)}</a>'
+                       for n, s in zip(p["categories"], p["categories_slug"]))
         
-        # Meta info pour les articles - ajouter author et min_read
         meta_parts = [f'<span>{p["date_str"]}</span>']
         if p.get("author"):
             meta_parts.append(f'<span>👤 By {html.escape(p["author"])}</span>')
@@ -901,19 +875,18 @@ def build(args):
         if chips:
             meta_parts.append(chips)
         
-        head=f'<div class="postmeta">{"".join(meta_parts)}</div>'
+        head = f'<div class="postmeta">{"".join(meta_parts)}</div>'
         
-        # Ajouter la miniature dans l'article si thumbnail_on_article est true
         thumbnail_html = ""
         if p.get("thumbnail_on_article") and p.get("thumbnail"):
             img_url = make_asset_url(p["thumbnail"], args.base_url)
             if img_url:
                 thumbnail_html = f'<div class="article-thumbnail"><img src="{html.escape(img_url)}" alt="Thumbnail for {html.escape(p["title"])}" loading="lazy"></div>'
         
-        body_html=head+thumbnail_html+md_render(p["md"])
-        post_title_meta = f"{p['title']} - {site_title_html}"  # Pour <title>
-        post_title_h1 = p['title']  # Pour <h1>
-        rendered[f"/{p['slug']}.html"]=minify_html(render_page(
+        body_html = head + thumbnail_html + md_render(p["md"])
+        post_title_meta = f"{p['title']} - {site_title_html}"
+        post_title_h1 = p['title']
+        rendered[f"/{p['slug']}.html"] = render_page(
             post_title_meta,
             body_html, 
             site_title, 
@@ -923,18 +896,18 @@ def build(args):
             favicon_url, 
             theme_css_url, 
             site_description,
-            "",  # pas de présentation
+            "",
             post_title_h1,
             lang=site_lang
-        ))
+        )
 
-    # categories - utilise nom de catégorie pour <h1>, titre complet pour <title>
-    for slug,(name,plist) in cat_map.items():
-        plist_sorted=sorted(plist,key=lambda p:p["date_obj"],reverse=True)
-        body=build_ordered_list(plist_sorted, args.base_url, default_thumb_url)
-        category_title_meta = f"Category · {name} - {site_title_html}"  # Pour <title>
-        category_title_h1 = f"Category · {name}"  # Pour <h1>
-        rendered[f"/category/{slug}.html"]=minify_html(render_page(
+    # categories - SANS minification
+    for slug, (name, plist) in cat_map.items():
+        plist_sorted = sorted(plist, key=lambda p: p["date_obj"], reverse=True)
+        body = build_ordered_list(plist_sorted, args.base_url, default_thumb_url)
+        category_title_meta = f"Category · {name} - {site_title_html}"
+        category_title_h1 = f"Category · {name}"
+        rendered[f"/category/{slug}.html"] = render_page(
             category_title_meta,
             body, 
             site_title, 
@@ -944,9 +917,9 @@ def build(args):
             favicon_url, 
             theme_css_url, 
             site_description,
-            "",  # pas de présentation
+            "",
             category_title_h1
-        ))
+        )
 
     if args.serve:
         _MemHandler.pages=rendered

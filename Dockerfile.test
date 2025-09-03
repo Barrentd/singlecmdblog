@@ -7,9 +7,13 @@ RUN apk add --no-cache nginx
 WORKDIR /app
 
 # Copier les fichiers du projet
-COPY . .
+COPY ./content ./content
+COPY ./public ./public
+COPY ./build.py ./build.py
+COPY ./requirements.txt ./requirements.txt
 
 # Builder le site
+RUN python3 -m pip install -r requirements.txt
 RUN python3 build.py
 
 # Supprimer la config par défaut d'Alpine
