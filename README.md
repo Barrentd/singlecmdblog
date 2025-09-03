@@ -148,3 +148,5 @@ SOFTWARE.
 ```
 
 Made with ❤️ and an unhealthy obsession with simplicity.
+
+## SingleCmdBlog v1.0 - When 900 lines of Python beat 50MB of WordPress
