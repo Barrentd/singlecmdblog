@@ -422,10 +422,14 @@ def collect_entries(content_dir:Path):
         thumbnail = meta.get("thumbnail", "")
         # Nouveau: support pour thumbnail_on_article
         thumbnail_on_article = str(meta.get("thumbnail_on_article", "")).lower() in ("true", "1", "yes")
+        # Nouveau: support pour min_read et author
+        min_read = meta.get("min_read", "")
+        author = meta.get("author", "")
         entry = {"slug":f.stem,"title":title,"subtitle":subtitle,"md":body,
                  "categories":cats,"categories_slug":[slugify(c) for c in cats],
                  "excerpt":excerpt_from_md(body),"date_obj":date_obj,"date_str":date_str,
-                 "thumbnail":thumbnail,"thumbnail_on_article":thumbnail_on_article}
+                 "thumbnail":thumbnail,"thumbnail_on_article":thumbnail_on_article,
+                 "min_read":min_read,"author":author}
         if is_page:
             pages[f.stem.lower()] = entry
         else:
@@ -446,8 +450,12 @@ def build_ordered_list(items, base_url:str, default_thumb_url:str|None=None)->st
         chips = " ".join(f'<span class="chip">{html.escape(n)}</span>'
                         for n in p["categories"])
         
-        # Meta info
+        # Meta info - ajouter author et min_read
         meta_parts = [f'<span>{p["date_str"]}</span>']
+        if p.get("author"):
+            meta_parts.append(f'<span>Par {html.escape(p["author"])}</span>')
+        if p.get("min_read"):
+            meta_parts.append(f'<span>{html.escape(str(p["min_read"]))} min de lecture</span>')
         if chips:
             meta_parts.append(chips)
         meta_html = f'<div class="postmeta">{"".join(meta_parts)}</div>'
@@ -762,7 +770,17 @@ def build(args):
     for p in posts:
         chips=" ".join(f'<a class="chip" href="{args.base_url}category/{s}.html">{html.escape(n)}</a>'
                        for n,s in zip(p["categories"],p["categories_slug"]))
-        head=f'<div class="postmeta"><span>{p["date_str"]}</span>{chips}</div>'
+        
+        # Meta info pour les articles - ajouter author et min_read
+        meta_parts = [f'<span>{p["date_str"]}</span>']
+        if p.get("author"):
+            meta_parts.append(f'<span>👤 By {html.escape(p["author"])}</span>')
+        if p.get("min_read"):
+            meta_parts.append(f'<span>⏱️ {html.escape(str(p["min_read"]))} min read</span>')
+        if chips:
+            meta_parts.append(chips)
+        
+        head=f'<div class="postmeta">{"".join(meta_parts)}</div>'
         
         # Ajouter la miniature dans l'article si thumbnail_on_article est true
         thumbnail_html = ""
