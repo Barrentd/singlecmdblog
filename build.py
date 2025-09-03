@@ -144,17 +144,6 @@ def parse_date(s:str)->dt.datetime|None:
     except (ValueError, TypeError): return None
 
 # ===================== Template / CSS / JS / minify =====================
-BASE_CSS = (
-"/* ...existing css jusqu'à la ligne social... */"
-"/* Presentation section intégrée dans le header */"
-".header-content{text-align:center;display:flex;flex-direction:column;align-items:center;gap:1rem}"
-".presentation{text-align:center;margin:0;padding:0;border:none;display:flex;flex-direction:column;align-content:center;justify-content:center;align-items:center}"
-".presentation-photo{width:120px;height:120px;border-radius:50%;object-fit:cover;margin:0;display:block;border:3px solid var(--card-border)}"
-".presentation-title{font-size:clamp(18px,3.5vw,24px);font-weight:500;margin:0;color:var(--muted);order:2}"
-".presentation-text{font-size:1rem;line-height:1.5;color:var(--muted);max-width:500px;margin:0;order:3}"
-"header h1{order:1;margin:0}"
-"@media(max-width:600px){.presentation-photo{width:100px;height:100px}.presentation-text{font-size:0.9rem;max-width:100%}.presentation-title{font-size:clamp(16px,3vw,20px)}}"
-)
 
 def palette_override(light:dict|None, dark:dict|None)->str:
     def css_from(prefix:str, pal:dict):
@@ -340,7 +329,7 @@ def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, pale
             f'<h2>All posts</h2>'
         )
     else:
-        header_content = f'<h1>All posts</h1>'
+        header_content = '<h1>All posts</h1>'
     
     # Minifier le CSS de palette avant injection
     minified_palette_css = minify_css(palette_css) if palette_css else ""
@@ -680,7 +669,7 @@ def build(args):
     default_thumb_url = make_asset_url(site.get("defaultThumbnail"), args.base_url)
 
     # Résolution du CSS de thème:
-    # Priorité: site.theme -> site.themeCss -> --theme-css
+    # Priorité: site.theme -> site.themeCss -> themes/default.css
     theme_css_url=None
     theme_rel=None
     theme = site.get("theme")
@@ -691,28 +680,30 @@ def build(args):
         elif t.endswith(".css"):
             theme_rel = t.lstrip("/") if not t.startswith("assets/") else t[len("assets/"):]
         else:
-            # nom de thème => assets/themes/<nom>.css
+            # nom de thème => themes/<nom>.css
             theme_rel = f"themes/{slugify(t)}.css"
     else:
-        theme_css_setting = site.get("themeCss") or args.theme_css  # ex: "assets/css/theme.css" ou URL complète
+        theme_css_setting = site.get("themeCss")
         if theme_css_setting:
             if theme_css_setting.startswith(("http://","https://")):
                 theme_css_url = theme_css_setting
             else:
                 rel = theme_css_setting.lstrip("/")
                 theme_rel = rel[len("assets/"):] if rel.startswith("assets/") else rel
+        else:
+            # Utiliser themes/default.css par défaut
+            theme_rel = "themes/default.css"
 
     if theme_rel:
         # URL publique
         theme_css_url = args.base_url.rstrip("/") + "/assets/" + theme_rel
-        # Auto-génération si manquant (écrit BASE_CSS minifié)
+        # Vérifier si le fichier existe, mais ne pas le créer automatiquement
         css_fs = public_dir / theme_rel
         if not css_fs.exists():
-            css_fs.parent.mkdir(parents=True, exist_ok=True)
-            # Minifier le CSS de base avant l'écriture
-            minified_base_css = minify_css(BASE_CSS)
-            css_fs.write_text(minified_base_css, encoding="utf-8")
-            print(f"[GEN]  Generated minified theme CSS: {css_fs}")
+            print(f"[WARN] Theme CSS file not found: {css_fs}")
+            print(f"[INFO] Create {css_fs} to customize the theme")
+            # Ne pas créer le fichier automatiquement
+            theme_css_url = None
 
     posts, pages = collect_entries(content_dir)
     posts.sort(key=lambda p:p["date_obj"], reverse=True)
