@@ -21,6 +21,14 @@ import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
+# Nouvelle importation pour la conversion d'images
+try:
+    from PIL import Image
+    PILLOW_AVAILABLE = True
+except ImportError:
+    PILLOW_AVAILABLE = False
+    print("[WARN] Pillow not available - image conversion disabled")
+
 # ===================== CLI =====================
 def parse_args():
     p = argparse.ArgumentParser(description="TinyBlog static generator")
@@ -33,8 +41,11 @@ def parse_args():
     p.add_argument("--serve", action="store_true", help="serve from memory (no files written)")
     p.add_argument("--host", default="127.0.0.1", help="dev server host")
     p.add_argument("--port", type=int, default=8080, help="dev server port")
-    # Nouveau: URL vers le CSS de thème (servi depuis /assets/)
     p.add_argument("--theme-css", default="assets/css/theme.css", help="URL du fichier CSS de thème (servi via /assets)")
+    # Nouvelles options pour la conversion WebP
+    p.add_argument("--webp-quality", type=int, default=85, help="qualité WebP (1-100, défaut: 85)")
+    p.add_argument("--keep-originals", action="store_true", help="conserver les images originales en plus des WebP")
+    p.add_argument("--no-webp", action="store_true", help="désactiver la conversion WebP")
     return p.parse_args()
 
 # ===================== Markdown engines =====================
@@ -643,6 +654,124 @@ def generate_robots_txt(robots_config: dict, site_url: str, base_url: str) -> st
     
     return "\n".join(lines)
 
+# ===================== Image conversion =====================
+def convert_image_to_webp(src_path: Path, dst_path: Path, quality: int = 85) -> bool:
+    """Convertit une image en WebP avec compression"""
+    if not PILLOW_AVAILABLE:
+        return False
+    
+    try:
+        with Image.open(src_path) as img:
+            # Convertir en RGB si nécessaire (pour PNG avec transparence)
+            if img.mode in ('RGBA', 'LA', 'P'):
+                # Créer un fond blanc pour les images avec transparence
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                if img.mode in ('RGBA', 'LA'):
+                    background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else img.split()[1])
+                    img = background
+            elif img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            # Sauvegarder en WebP
+            img.save(dst_path, 'WebP', quality=quality, optimize=True)
+            return True
+    except Exception as e:
+        print(f"[ERROR] Failed to convert {src_path} to WebP: {e}")
+        return False
+
+def should_convert_to_webp(file_path: Path) -> bool:
+    """Détermine si un fichier doit être converti en WebP"""
+    image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif'}
+    return file_path.suffix.lower() in image_extensions
+
+def process_images(public_dir: Path, out_dir: Path, webp_quality: int = 85, keep_originals: bool = False) -> dict:
+    """
+    Traite les images : conversion en WebP + copie des originaux si demandé
+    Retourne un mapping old_path -> new_path pour mettre à jour les références
+    """
+    if not PILLOW_AVAILABLE:
+        print("[SKIP] Image conversion disabled - Pillow not available")
+        return {}
+    
+    path_mapping = {}
+    assets_dir = out_dir / "assets"
+    
+    if not public_dir.exists():
+        return path_mapping
+    
+    for src in public_dir.rglob("*"):
+        if not src.is_file():
+            continue
+        
+        rel_path = src.relative_to(public_dir)
+        dst = assets_dir / rel_path
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        
+        if should_convert_to_webp(src):
+            # Créer le nom du fichier WebP
+            webp_name = src.stem + '.webp'
+            webp_dst = dst.parent / webp_name
+            webp_rel = rel_path.parent / webp_name
+            
+            # Convertir en WebP
+            if convert_image_to_webp(src, webp_dst, webp_quality):
+                # Calculer les tailles pour comparaison
+                original_size = src.stat().st_size
+                webp_size = webp_dst.stat().st_size
+                savings = ((original_size - webp_size) / original_size * 100) if original_size > 0 else 0
+                
+                print(f"[WEBP] {rel_path} -> {webp_rel} ({webp_size} bytes, {savings:.1f}% smaller)")
+                
+                # Mapper l'ancien chemin vers le nouveau
+                old_url = f"assets/{rel_path.as_posix()}"
+                new_url = f"assets/{webp_rel.as_posix()}"
+                path_mapping[old_url] = new_url
+                
+                # Copier l'original si demandé
+                if keep_originals:
+                    shutil.copy2(src, dst)
+                    print(f"[COPY] Original kept: {rel_path}")
+            else:
+                # Échec de la conversion, copier l'original
+                shutil.copy2(src, dst)
+                print(f"[COPY] Conversion failed, original copied: {rel_path}")
+        else:
+            # Fichier non-image, copier tel quel
+            if src.suffix.lower() == '.css':
+                css_content = src.read_text(encoding="utf-8")
+                minified_css = minify_css(css_content)
+                dst.write_text(minified_css, encoding="utf-8")
+                print(f"[MIN]  Minified CSS: {rel_path}")
+            else:
+                shutil.copy2(src, dst)
+    
+    return path_mapping
+
+def update_html_image_references(html_content: str, path_mapping: dict) -> str:
+    """Met à jour les références d'images dans le HTML"""
+    if not path_mapping:
+        return html_content
+    
+    # Mettre à jour les src d'images
+    def replace_src(match):
+        full_match = match.group(0)
+        src_value = match.group(1)
+        
+        # Nettoyer l'URL (enlever les guillemets doubles)
+        clean_src = src_value.strip('"\'')
+        
+        if clean_src in path_mapping:
+            new_src = path_mapping[clean_src]
+            return full_match.replace(src_value, f'"{new_src}"')
+        return full_match
+    
+    # Pattern pour capturer src="..." ou src='...'
+    html_content = re.sub(r'src=(["\'][^"\']*["\'])', replace_src, html_content)
+    
+    return html_content
+
 # ===================== Build =====================
 def build(args):
     root=Path.cwd()
@@ -829,7 +958,35 @@ def build(args):
         return
 
     out_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Traitement des images avec conversion WebP
+    path_mapping = {}
+    if not args.no_webp and PILLOW_AVAILABLE:
+        path_mapping = process_images(public_dir, out_dir, args.webp_quality, args.keep_originals)
+    else:
+        # Copie standard sans conversion
+        (out_dir/"assets").mkdir(parents=True, exist_ok=True)
+        if public_dir.exists():
+            for src in public_dir.rglob("*"):
+                if src.is_file():
+                    rel=src.relative_to(public_dir)
+                    dst=out_dir/"assets"/rel
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    
+                    if src.suffix.lower() == '.css':
+                        css_content = src.read_text(encoding="utf-8")
+                        minified_css = minify_css(css_content)
+                        dst.write_text(minified_css, encoding="utf-8")
+                        print(f"[MIN]  Minified CSS: {rel}")
+                    else:
+                        shutil.copy2(src,dst)
+    
+    # Écriture des fichiers HTML avec mise à jour des références d'images
     for route, html_doc in rendered.items():
+        # Mettre à jour les références d'images si nécessaire
+        if path_mapping:
+            html_doc = update_html_image_references(html_doc, path_mapping)
+        
         out_file=out_dir/route.lstrip("/")
         out_file.parent.mkdir(parents=True, exist_ok=True)
         out_file.write_text(html_doc, encoding="utf-8")
@@ -851,24 +1008,9 @@ def build(args):
     robots_file.write_text(robots_txt, encoding="utf-8")
     print(f"[OK]   robots.txt generated")
     
-    # Toujours créer le dossier assets (même s'il n'y a rien à copier)
-    (out_dir/"assets").mkdir(parents=True, exist_ok=True)
-    if public_dir.exists():
-        for src in public_dir.rglob("*"):
-            if src.is_file():
-                rel=src.relative_to(public_dir)
-                dst=out_dir/"assets"/rel
-                dst.parent.mkdir(parents=True, exist_ok=True)
-                
-                # Minifier les fichiers CSS lors de la copie
-                if src.suffix.lower() == '.css':
-                    css_content = src.read_text(encoding="utf-8")
-                    minified_css = minify_css(css_content)
-                    dst.write_text(minified_css, encoding="utf-8")
-                    print(f"[MIN]  Minified CSS: {rel}")
-                else:
-                    shutil.copy2(src,dst)
     print(f"[DONE] {len(posts)} post(s), {len(cat_map)} category page(s) + index @ {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    if path_mapping:
+        print(f"[INFO] {len(path_mapping)} image(s) converted to WebP")
 
 def build_social_links(social_config: dict, base_url: str) -> str:
     """Génère les liens vers les réseaux sociaux avec icônes SVG"""
