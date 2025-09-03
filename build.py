@@ -322,7 +322,7 @@ def minify_css(css: str) -> str:
     
     return css
 
-def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, palette_css:str, nav_html:str, favicon_url:str|None, theme_css_url:str|None, description:str|None=None, presentation_html:str="", page_h1:str="", hide_h1:bool=False, lang:str="en")->str:
+def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, palette_css:str, nav_html:str, favicon_url:str|None, theme_css_url:str|None, description:str|None=None, presentation_html:str="", page_h1:str="", lang:str="en")->str:
     favicon_tag = f'<link rel=icon href="{html.escape(favicon_url)}">' if favicon_url else ""
     theme_link = f'<link rel=stylesheet href="{html.escape(theme_css_url)}">' if theme_css_url else ""
     description_tag = f'<meta name=description content="{html.escape(description)}">' if description else ""
@@ -332,17 +332,15 @@ def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, pale
     
     # Si on a du contenu de présentation, on l'intègre dans le header
     if presentation_html:
-        # Masquer le h1 si hide_h1 est True
-        # h1_element = f'<h1 style="display:none;">{html.escape(h1_text)}</h1>' if hide_h1 else f'<h1>{html.escape(h1_text)}</h1>'
         header_content = (
             f'<div class="header-content">'
             # f'{h1_element}'
             f'<div class="presentation">{presentation_html}</div>'
             f'</div>'
+            f'<h2>All posts</h2>'
         )
     else:
-        # Masquer le h1 si hide_h1 est True
-        header_content = f'<h1 style="display:none;">{html.escape(h1_text)}</h1>' if hide_h1 else f'<h1>{html.escape(h1_text)}</h1>'
+        header_content = f'<h1>All posts</h1>'
     
     # Minifier le CSS de palette avant injection
     minified_palette_css = minify_css(palette_css) if palette_css else ""
@@ -409,11 +407,11 @@ def excerpt_from_md(md:str, limit:int=160)->str:
 def collect_entries(content_dir:Path):
     posts, pages = [], {}
     for f in sorted(content_dir.glob("*.md")):
-        
+
         if f.stem.lower() in ("example", "exemple", "_example", "_exemple"):
             print(f"[SKIP] Ignoring example file: {f.name}")
-            continue        
-        
+            continue
+
         raw=f.read_text(encoding="utf-8").strip()
         meta, body = parse_front_matter(raw)
         title = meta.get("title") or (body.splitlines()[0].lstrip("# ").strip() if body else f.stem) or f.stem
@@ -458,9 +456,9 @@ def build_ordered_list(items, base_url:str, default_thumb_url:str|None=None)->st
         # Meta info - ajouter author et min_read
         meta_parts = [f'<span>{p["date_str"]}</span>']
         if p.get("author"):
-            meta_parts.append(f'<span>Par {html.escape(p["author"])}</span>')
+            meta_parts.append(f'<span>👤 By {html.escape(p["author"])}</span>')
         if p.get("min_read"):
-            meta_parts.append(f'<span>{html.escape(str(p["min_read"]))} min de lecture</span>')
+            meta_parts.append(f'<span>⌛ {html.escape(str(p["min_read"]))} min read</span>')
         if chips:
             meta_parts.append(chips)
         meta_html = f'<div class="postmeta">{"".join(meta_parts)}</div>'
@@ -737,17 +735,16 @@ def build(args):
     idx_body=build_ordered_list(posts, args.base_url, default_thumb_url)
     rendered["/index.html"]=minify_html(render_page(
         site_title_html,           # <title> dans le head
-        idx_body, 
-        site_title, 
-        args.base_url, 
-        pal_css, 
-        nav_html, 
-        favicon_url, 
-        theme_css_url, 
-        site_description, 
+        idx_body,
+        site_title,
+        args.base_url,
+        pal_css,
+        nav_html,
+        favicon_url,
+        theme_css_url,
+        site_description,
         presentation_html,
-        site_title,                # <h1> dans le body (même que navigation)
-        hide_h1=True,              # MASQUER le h1 sur la page d'accueil
+        site_title, # <h1> dans le body (même que navigation)
         lang=site_lang
     ))
 
@@ -767,7 +764,6 @@ def build(args):
             site_description,
             "",  # pas de présentation
             page_title_h1,
-            hide_h1=False,  # Afficher le h1 sur les pages
             lang=site_lang
         ))
 
@@ -781,7 +777,7 @@ def build(args):
         if p.get("author"):
             meta_parts.append(f'<span>👤 By {html.escape(p["author"])}</span>')
         if p.get("min_read"):
-            meta_parts.append(f'<span>⏱️ {html.escape(str(p["min_read"]))} min read</span>')
+            meta_parts.append(f'<span>⌛ {html.escape(str(p["min_read"]))} min read</span>')
         if chips:
             meta_parts.append(chips)
         
@@ -809,7 +805,6 @@ def build(args):
             site_description,
             "",  # pas de présentation
             post_title_h1,
-            hide_h1=False,  # Afficher le h1 sur les articles
             lang=site_lang
         ))
 
@@ -830,8 +825,7 @@ def build(args):
             theme_css_url, 
             site_description,
             "",  # pas de présentation
-            category_title_h1,
-            hide_h1=False  # Afficher le h1 sur les catégories
+            category_title_h1
         ))
 
     if args.serve:

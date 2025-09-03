@@ -12,7 +12,7 @@ SingleCmdBlog is a ridiculously simple static blog generator that fits in a sing
 - Dark/Light theme toggle
 - Categories
 - Mobile-friendly (your mom can read it on her phone)
-- Fast as lightning ⚡ (14KB page limit enforced!)
+- Fast as lightning (14KB page limit enforced!)
 - Zero dependencies (well, Python... but that's it!)
 
 ## Quick Start
@@ -86,6 +86,7 @@ Cats are basically tiny furry overlords...
 ```
 
 **Pro tips:**
+
 - Date format: `YYYY-MM-DD`
 - Categories: comma-separated (spaces optional, life is short)
 - Pages: add `page: true` to front matter for non-blog pages
@@ -99,11 +100,13 @@ Cats are basically tiny furry overlords...
 ## Deployment
 
 **Static hosting (recommended):**
+
 - Netlify: drag & drop the `build/` folder
 - GitHub Pages: push `build/` contents
 - Any web server: upload `build/` contents
 
 **Or use the Docker image** (because containers solve everything):
+
 ```bash
 docker run -p 80:80 tinyblog
 ```
@@ -122,7 +125,7 @@ docker run -p 80:80 tinyblog
 
 MIT License - because sharing is caring! 🎉
 
-```
+```text
 Copyright (c) 2025 TinyBlog Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
