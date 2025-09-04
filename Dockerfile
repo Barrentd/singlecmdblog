@@ -6,14 +6,17 @@ RUN apk add --no-cache nginx
 # Créer répertoire de travail
 WORKDIR /app
 
+# Installer les dépendances Python
+COPY ./requirements.txt ./requirements.txt
+RUN python3 -m pip install -r requirements.txt
+
 # Copier les fichiers du projet
 COPY ./content ./content
 COPY ./public ./public
 COPY ./build.py ./build.py
-COPY ./requirements.txt ./requirements.txt
+COPY ./site.json ./site.json
 
 # Builder le site
-RUN python3 -m pip install -r requirements.txt
 RUN python3 build.py
 
 # Copier la configuration nginx
