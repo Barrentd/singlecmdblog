@@ -126,7 +126,7 @@ docker run -p 80:80 tinyblog
 MIT License - because sharing is caring! 🎉
 
 ```text
-Copyright (c) 2025 TinyBlog Contributors
+Copyright (c) 2025 Singlecmdblog Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

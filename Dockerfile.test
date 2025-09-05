@@ -10,6 +10,10 @@ WORKDIR /app
 COPY ./requirements.txt ./requirements.txt
 RUN python3 -m pip install -r requirements.txt
 
+# Copier la configuration nginx et supprimer la config par défaut d'Alpine
+COPY ./nginx.conf /etc/nginx/http.d/singlecmdblog.conf
+RUN rm -f /etc/nginx/http.d/default.conf
+
 # Copier les fichiers du projet
 COPY ./content ./content
 COPY ./public ./public
@@ -18,10 +22,6 @@ COPY ./site.json ./site.json
 
 # Builder le site
 RUN python3 build.py
-
-# Copier la configuration nginx et supprimer la config par défaut d'Alpine
-COPY ./nginx.conf /etc/nginx/http.d/singlecmdblog.conf
-RUN rm -f /etc/nginx/http.d/default.conf
 
 # Exposer le port
 EXPOSE 80

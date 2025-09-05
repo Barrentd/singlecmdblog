@@ -377,8 +377,8 @@ def make_asset_url(u:str|None, base_url:str)->str|None:
     u=u.strip()
     if not u: return None
     if u.startswith(("http://","https://","data:")): return u
-    if u.startswith("/"): return base_url.rstrip("/") + u
-    return base_url + u  # p.ex. "assets/img.png" -> "<base_url>assets/img.png"
+    if u.startswith("/"): return u
+    return base_url.rstrip("/") + "/" + u.lstrip("/")
 
 def excerpt_from_md(md:str, limit:int=160)->str:
     for line in md.splitlines():
@@ -392,9 +392,9 @@ def collect_entries(content_dir:Path):
     posts, pages = [], {}
     for f in sorted(content_dir.glob("*.md")):
 
-        if f.stem.lower() in ("example", "exemple", "_example", "_exemple"):
-            print(f"[SKIP] Ignoring example file: {f.name}")
-            continue
+        # if f.stem.lower() in ("example", "exemple", "_example", "_exemple"):
+        #     print(f"[SKIP] Ignoring example file: {f.name}")
+        #     continue
 
         raw=f.read_text(encoding="utf-8").strip()
         meta, body = parse_front_matter(raw)
@@ -670,14 +670,33 @@ def should_convert_to_webp(file_path: Path) -> bool:
     image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif'}
     return file_path.suffix.lower() in image_extensions
 
-def process_images(public_dir: Path, out_dir: Path, webp_quality: int = 85, keep_originals: bool = False) -> dict:
+def process_images(public_dir: Path, out_dir: Path, webp_config: dict, args_webp_quality: int = 85, args_keep_originals: bool = False, args_no_webp: bool = False) -> dict:
     """
     Traite les images : conversion en WebP + copie des originaux si demandé
     Retourne un mapping old_path -> new_path pour mettre à jour les références
     """
-    if not PILLOW_AVAILABLE:
-        print("[SKIP] Image conversion disabled - Pillow not available")
+    # Déterminer si WebP est activé
+    webp_enabled = not args_no_webp
+    if webp_config:
+        webp_enabled = webp_config.get("enabled", True) and not args_no_webp
+    
+    if not webp_enabled or not PILLOW_AVAILABLE:
+        if not PILLOW_AVAILABLE:
+            print("[SKIP] Image conversion disabled - Pillow not available")
+        else:
+            print("[SKIP] WebP conversion disabled by configuration")
         return {}
+    
+    # Paramètres de conversion (priorité: args CLI > site.json > défaut)
+    quality = args_webp_quality
+    if webp_config and "quality" in webp_config:
+        quality = webp_config.get("quality", 85)
+    
+    keep_originals = args_keep_originals
+    if webp_config and "keepOriginals" in webp_config:
+        keep_originals = webp_config.get("keepOriginals", False)
+    
+    print(f"[WEBP] Starting conversion with quality={quality}, keepOriginals={keep_originals}")
     
     path_mapping = {}
     assets_dir = out_dir / "assets"
@@ -685,6 +704,7 @@ def process_images(public_dir: Path, out_dir: Path, webp_quality: int = 85, keep
     if not public_dir.exists():
         return path_mapping
     
+    conversion_count = 0
     for src in public_dir.rglob("*"):
         if not src.is_file():
             continue
@@ -700,17 +720,18 @@ def process_images(public_dir: Path, out_dir: Path, webp_quality: int = 85, keep
             webp_rel = rel_path.parent / webp_name
             
             # Convertir en WebP
-            if convert_image_to_webp(src, webp_dst, webp_quality):
+            if convert_image_to_webp(src, webp_dst, quality):
                 # Calculer les tailles pour comparaison
                 original_size = src.stat().st_size
                 webp_size = webp_dst.stat().st_size
                 savings = ((original_size - webp_size) / original_size * 100) if original_size > 0 else 0
                 
                 print(f"[WEBP] {rel_path} -> {webp_rel} ({webp_size} bytes, {savings:.1f}% smaller)")
+                conversion_count += 1
                 
-                # Mapper l'ancien chemin vers le nouveau
-                old_url = f"assets/{rel_path.as_posix()}"
-                new_url = f"assets/{webp_rel.as_posix()}"
+                # Mapper l'ancien chemin vers le nouveau (chemins absolus depuis la racine)
+                old_url = f"/assets/{rel_path.as_posix()}"
+                new_url = f"/assets/{webp_rel.as_posix()}"
                 path_mapping[old_url] = new_url
                 
                 # Copier l'original si demandé
@@ -731,30 +752,45 @@ def process_images(public_dir: Path, out_dir: Path, webp_quality: int = 85, keep
             else:
                 shutil.copy2(src, dst)
     
+    if conversion_count > 0:
+        print(f"[WEBP] Successfully converted {conversion_count} image(s) to WebP")
+    
     return path_mapping
 
 def update_html_image_references(html_content: str, path_mapping: dict) -> str:
-    """Met à jour les références d'images dans le HTML"""
+    """Met à jour les références d'images dans le HTML avec gestion améliorée des chemins"""
     if not path_mapping:
         return html_content
     
-    # Mettre à jour les src d'images
     def replace_src(match):
         full_match = match.group(0)
         src_value = match.group(1)
         
-        # Nettoyer l'URL (enlever les guillemets doubles)
+        # Nettoyer l'URL (enlever les guillemets)
         clean_src = src_value.strip('"\'')
         
-        if clean_src in path_mapping:
-            new_src = path_mapping[clean_src]
-            return full_match.replace(src_value, f'"{new_src}"')
+        # Essayer différentes variantes du chemin
+        variants = [
+            clean_src,
+            clean_src.lstrip('/'),  # Enlever / du début
+            f"assets/{clean_src}" if not clean_src.startswith('assets/') else clean_src,
+        ]
+        
+        # Si le chemin commence par base_url, l'enlever pour la comparaison
+        if clean_src.startswith(('http://', 'https://')):
+            return full_match  # Ne pas toucher aux URLs absolues
+        
+        for variant in variants:
+            if variant in path_mapping:
+                new_src = path_mapping[variant]
+                return full_match.replace(src_value, f'"{new_src}"')
+        
         return full_match
     
     # Pattern pour capturer src="..." ou src='...'
-    html_content = re.sub(r'src=(["\'][^"\']*["\'])', replace_src, html_content)
+    updated_html = re.sub(r'src=(["\'][^"\']*["\'])', replace_src, html_content)
     
-    return html_content
+    return updated_html
 
 # ===================== Build =====================
 def build(args):
@@ -766,8 +802,11 @@ def build(args):
     site_description = site.get("description", "")
     site_title = site.get("title", "TinyBlog")
     site_title_html = site.get("site_title", site_title)
-    site_url = site.get("siteUrl", "")  # Nouvelle variable pour le sitemap
-    site_lang = site.get("lang", "en")  # Langue du site, par défaut 'en'
+    site_url = site.get("siteUrl", "")
+    site_lang = site.get("lang", "en")
+    
+    # Configuration WebP depuis site.json
+    webp_config = site.get("webp", {})
     
     # Génération de la section présentation
     presentation_html = build_presentation_section(site.get("presentation", {}), args.base_url)
@@ -835,7 +874,7 @@ def build(args):
     
     rendered={}
     
-    # index - SANS minification
+    # index
     idx_body = build_ordered_list(posts, args.base_url, default_thumb_url)
     rendered["/index.html"] = minify_html(render_page(
         site_title_html,
@@ -852,7 +891,7 @@ def build(args):
         lang=site_lang
     ))
 
-    # pages - SANS minification
+    # pages
     for slug, page_data in pages.items():
         page_title_meta = f"{page_data['title']} - {site_title_html}"
         page_title_h1 = page_data['title']
@@ -871,7 +910,7 @@ def build(args):
             lang=site_lang
         ))
 
-    # posts - SANS minification
+    # posts
     for p in posts:
         chips = " ".join(f'<a class="chip" href="{args.base_url}category/{s}.html">{html.escape(n)}</a>'
                        for n, s in zip(p["categories"], p["categories_slug"]))
@@ -910,7 +949,7 @@ def build(args):
             lang=site_lang
         ))
 
-    # categories - SANS minification
+    # categories
     for slug, (name, plist) in cat_map.items():
         plist_sorted = sorted(plist, key=lambda p: p["date_obj"], reverse=True)
         body = build_ordered_list(plist_sorted, args.base_url, default_thumb_url)
@@ -941,12 +980,18 @@ def build(args):
 
     out_dir.mkdir(parents=True, exist_ok=True)
     
-    # Traitement des images avec conversion WebP
-    path_mapping = {}
-    if not args.no_webp and PILLOW_AVAILABLE:
-        path_mapping = process_images(public_dir, out_dir, args.webp_quality, args.keep_originals)
-    else:
-        # Copie standard sans conversion
+    # Traitement des images avec conversion WebP (utilise la config de site.json)
+    path_mapping = process_images(
+        public_dir, 
+        out_dir, 
+        webp_config,
+        args.webp_quality, 
+        args.keep_originals, 
+        args.no_webp
+    )
+    
+    # Copie des fichiers non traités par process_images
+    if not path_mapping:  # Si WebP désactivé, copier tous les assets
         (out_dir/"assets").mkdir(parents=True, exist_ok=True)
         if public_dir.exists():
             for src in public_dir.rglob("*"):
@@ -959,7 +1004,7 @@ def build(args):
                         css_content = src.read_text(encoding="utf-8")
                         minified_css = minify_css(css_content)
                         dst.write_text(minified_css, encoding="utf-8")
-                        print(f"[MIN]  Minified CSS: {rel}")
+                        print(f"[MIN] Minified CSS: {rel}")
                     else:
                         shutil.copy2(src,dst)
     

@@ -25,8 +25,8 @@
     "photo": "assets/profile.png"
   },
   "webp": {
-    "enabled": false,
+    "enabled": true,
     "quality": 85,
-    "keepOriginals": true
+    "keepOriginals": false
   }
 }
