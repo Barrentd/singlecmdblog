@@ -14,19 +14,19 @@
     "sitemap": true
   },
   "social": {
-    "github": "https://github.com/moncompte",
-    "twitter": "https://twitter.com/moncompte",
-    "linkedin": "https://linkedin.com/in/moncompte"
+    "github": "https://github.com",
+    "twitter": "https://twitter.com",
+    "linkedin": "https://linkedin.com"
   },
   "presentation": {
-    "enabled": true,
+    "enabled": false,
     "title": "Bienvenue sur mon blog",
     "text": "Découvrez mes articles sur le développement web, la technologie et mes réflexions personnelles. Je partage ici mes expériences et mes apprentissages.",
     "photo": "assets/profile.png"
   },
   "webp": {
-    "enabled": true,
+    "enabled": false,
     "quality": 85,
-    "keepOriginals": false
+    "keepOriginals": true
   }
 }

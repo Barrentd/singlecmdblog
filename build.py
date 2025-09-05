@@ -31,7 +31,7 @@ except ImportError:
 
 # ===================== CLI =====================
 def parse_args():
-    p = argparse.ArgumentParser(description="TinyBlog static generator")
+    p = argparse.ArgumentParser(description="Singlecmdblog static generator")
     p.add_argument("--content", default="content", help="content directory (markdown)")
     p.add_argument("--public",  default="public",  help="static assets dir served at /assets/")
     p.add_argument("--out",     default="build",   help="output directory")
@@ -42,17 +42,17 @@ def parse_args():
     p.add_argument("--host", default="127.0.0.1", help="dev server host")
     p.add_argument("--port", type=int, default=8080, help="dev server port")
     p.add_argument("--theme-css", default="assets/css/theme.css", help="URL du fichier CSS de thème (servi via /assets)")
-    # Nouvelles options pour la conversion WebP
     p.add_argument("--webp-quality", type=int, default=85, help="qualité WebP (1-100, défaut: 85)")
     p.add_argument("--keep-originals", action="store_true", help="conserver les images originales en plus des WebP")
     p.add_argument("--no-webp", action="store_true", help="désactiver la conversion WebP")
     return p.parse_args()
 
 # ===================== Markdown engines =====================
-def _markdown_engine():
+def _markdown_engine(debug: bool = False):
     # Try full engine (python-markdown + pymdown-extensions)
     if importlib.util.find_spec("markdown"):
-        print("[DEBUG] Markdown engine = FULL")
+        if debug:
+            print("[DEBUG] Markdown engine = FULL")
         import markdown  # type: ignore
 
         # No codehilite: highlighting is done by HLJS on the client
@@ -66,10 +66,12 @@ def _markdown_engine():
             "pymdownx.tabbed",  # tabs/onglets
         ):
             if importlib.util.find_spec(ext_name):
-                print(f"[DEBUG] Found extension: {ext_name}")
+                if debug:
+                    print(f"[DEBUG] Found extension: {ext_name}")
                 exts.append(ext_name)
 
-        print(f"[DEBUG] Extensions: {exts}")
+        if debug:
+            print(f"[DEBUG] Extensions: {exts}")
         md = markdown.Markdown(
             extensions=exts,
             extension_configs={
@@ -81,15 +83,19 @@ def _markdown_engine():
         )
 
         def render_with_debug(text: str) -> str:
-            print(f"[DEBUG] Input markdown length: {len(text)}")
+            if debug:
+                print(f"[DEBUG] Input markdown length: {len(text)}")
             result = md.reset().convert(text)
-            print(f"[DEBUG] Output HTML length: {len(result)}")
-            print(f"[DEBUG] First 200 chars of HTML: {result[:200]}")
+            if debug:
+                print(f"[DEBUG] Output HTML length: {len(result)}")
+                print(f"[DEBUG] First 200 chars of HTML: {result[:200]}")
             return result
 
         return render_with_debug
 
-md_render=_markdown_engine()
+# You can control debug output by changing this flag
+DEBUG_MARKDOWN = False
+md_render = _markdown_engine(debug=DEBUG_MARKDOWN)
 
 # ===================== Front matter =====================
 def parse_front_matter(md:str):
@@ -538,7 +544,7 @@ def generate_sitemap(site_url: str, posts: list, pages: dict, categories: dict, 
         })
     
     # Pages de catégories - priorité basse, changement avec nouveaux posts
-    for cat_slug, (cat_name, cat_posts) in categories.items():
+    for cat_slug, (_, cat_posts) in categories.items():
         if cat_posts:  # Seulement si la catégorie a des posts
             # Date du post le plus récent dans cette catégorie
             latest_post = max(cat_posts, key=lambda p: p['date_obj'])
@@ -718,7 +724,7 @@ def process_images(public_dir: Path, out_dir: Path, webp_quality: int = 85, keep
                 css_content = src.read_text(encoding="utf-8")
                 minified_css = minify_css(css_content)
                 dst.write_text(minified_css, encoding="utf-8")
-                print(f"[MIN]  Minified CSS: {rel_path}")
+                print(f"[MIN] Minified CSS: {rel_path}")
             else:
                 shutil.copy2(src, dst)
     
@@ -970,7 +976,7 @@ def build(args):
         sitemap_xml = generate_sitemap(site_url, posts, pages, cat_map, args.base_url)
         sitemap_file = out_dir / "sitemap.xml"
         sitemap_file.write_text(sitemap_xml, encoding="utf-8")
-        print(f"[OK]   sitemap.xml generated with {len(posts) + len(pages) + len(cat_map) + 1} URLs")
+        print(f"[OK] sitemap.xml generated with {len(posts) + len(pages) + len(cat_map) + 1} URLs")
     else:
         print("[SKIP] sitemap.xml - no siteUrl defined in site.json")
     
@@ -979,7 +985,7 @@ def build(args):
     robots_txt = generate_robots_txt(robots_config, site_url, args.base_url)
     robots_file = out_dir / "robots.txt"
     robots_file.write_text(robots_txt, encoding="utf-8")
-    print(f"[OK]   robots.txt generated")
+    print("[OK] robots.txt generated")
     
     print(f"[DONE] {len(posts)} post(s), {len(cat_map)} category page(s) + index @ {time.strftime('%Y-%m-%d %H:%M:%S')}")
     if path_mapping:
