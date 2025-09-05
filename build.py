@@ -303,7 +303,10 @@ def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, pale
             f'<h2>All posts</h2>'
         )
     else:
-        header_content = f'<h1>{h1_text}</h1>'
+        header_content = (
+            f'<h1>{h1_text}</h1>'
+            f'<h2>All posts</h2>'
+        )
 
     # PAS de minification du CSS non plus
     css_content = palette_css if palette_css else ""
