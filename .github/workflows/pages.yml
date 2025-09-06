@@ -1,12 +1,16 @@
-# .github/workflows/pages.yml
 name: Deploy to GitHub Pages
+
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+  workflow_dispatch:
+
 permissions:
   contents: read
   pages: write
   id-token: write
+
 concurrency:
   group: pages
   cancel-in-progress: true
@@ -15,23 +19,34 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.12" }
-      - name: Install deps
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-      - name: Build site
-        env: { REPO_NAME: ${{ github.event.repository.name }} }
-        run: python build.py --base-url "/${REPO_NAME}/"
-      - name: Setup Pages
+
+      - name: Build static site
+        env:
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          python build.py --base-url "/${REPO_NAME}/"
+
+      - name: Setup Pages (enable if needed)
         uses: actions/configure-pages@v5
         with:
-          enablement: true         # 👈 auto-enable Pages
+          enablement: true
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
-        with: { path: build }
+        with:
+          path: build
 
   deploy:
     needs: build
