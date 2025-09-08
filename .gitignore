@@ -12,6 +12,7 @@ out/
 # Content directory
 content/*.md
 !content/example.md
+!content/example_page.md
 
 # Environment files
 .env
