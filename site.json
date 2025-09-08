@@ -22,7 +22,7 @@
     "enabled": true,
     "title": "Welcome to my blog",
     "text": "Discover my articles on web development, technology and my personal reflections. I share here my experiences and learnings.",
-    "photo": "assets/profile.png"
+    "photo": "assets/profile.webp"
   },
   "webp": {
     "enabled": true,

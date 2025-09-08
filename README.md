@@ -15,9 +15,9 @@ SingleCmdBlog is a ridiculously simple static blog generator that fits in a sing
 - Fast as lightning (14KB page limit enforced!)
 - Zero dependencies (well, Python... but that's it!)
 
-## Live Demo
+## 🚀 Live Demo
 
-🚀 **[View Live Demo](https://barrentd.github.io/singlecmdblog/)**
+### **[🌐 View Live Demo](https://barrentd.github.io/singlecmdblog/){:target="_blank"}**
 
 Check out SingleCmdBlog in action! The demo showcases:
 
