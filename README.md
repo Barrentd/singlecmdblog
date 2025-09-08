@@ -17,7 +17,7 @@ SingleCmdBlog is a ridiculously simple static blog generator that fits in a sing
 
 ## 🚀 Live Demo
 
-### **[🌐 View Live Demo](https://barrentd.github.io/singlecmdblog/){:target="_blank"}**
+### **[🌐 View Live Demo](https://barrentd.github.io/singlecmdblog/)**
 
 Check out SingleCmdBlog in action! The demo showcases:
 

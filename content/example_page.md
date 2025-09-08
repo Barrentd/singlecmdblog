@@ -35,8 +35,8 @@ def hello_world():
 
 You can link to other pages and posts just like in regular Markdown:
 
-- [Back to Home](/)
-- [Example Article](/example.html)
+- [Back to Home](/singlecmdblog/)
+- [Example Article](/singlecmdblog/example.html)
 
 ## Perfect For
 
