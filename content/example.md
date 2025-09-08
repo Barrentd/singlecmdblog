@@ -5,7 +5,7 @@ categories: Example
 min_read: 1
 author: barrentd
 date: 2025-08-27
-thumbnail: singlecmdblog/assets/screen.jpg
+thumbnail: /assets/screen.jpg
 thumbnail_on_article: true
 ---
 
