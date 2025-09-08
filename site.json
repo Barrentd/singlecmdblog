@@ -5,7 +5,7 @@
   "description": "Blog description",
   "lang": "fr",
   "favicon": "assets/favicon.ico",
-  "defaultThumbnail": "assets/default-thumb.png",
+  "defaultThumbnail": "assets/default-thumb.webp",
   "theme": "",
   "robotsTxt": {
     "userAgent": "*",
@@ -14,12 +14,12 @@
     "sitemap": true
   },
   "social": {
-    "github": "https://github.com",
+    "github": "https://github.com/barrentd",
     "twitter": "https://twitter.com",
     "linkedin": "https://linkedin.com"
   },
   "presentation": {
-    "enabled": false,
+    "enabled": true,
     "title": "Welcome to my blog",
     "text": "Discover my articles on web development, technology and my personal reflections. I share here my experiences and learnings.",
     "photo": "assets/profile.png"
@@ -27,6 +27,6 @@
   "webp": {
     "enabled": true,
     "quality": 85,
-    "keepOriginals": true
+    "keepOriginals": false
   }
 }

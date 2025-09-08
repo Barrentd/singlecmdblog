@@ -1,6 +1,6 @@
 # SingleCmdBlog
 
-> Write it, build it, ship it
+> Write it in markdown, build it in one cmd, ship it  - The only three steps between your brilliant ideas and the internet.
 
 ## What is this?
 
@@ -15,6 +15,20 @@ SingleCmdBlog is a ridiculously simple static blog generator that fits in a sing
 - Fast as lightning (14KB page limit enforced!)
 - Zero dependencies (well, Python... but that's it!)
 
+## Live Demo
+
+🚀 **[View Live Demo](https://barrentd.github.io/singlecmdblog/)**
+
+Check out SingleCmdBlog in action! The demo showcases:
+
+- Clean, responsive design with dark/light theme toggle
+- Fast loading times (under 14KB per page)
+- Mobile-friendly layout
+- Category-based organization
+- Sample blog posts and pages
+
+*The demo is built and deployed automatically using GitHub Actions - because even our demos follow the "one command" philosophy!*
+
 ## Quick Start
 
 **The "I want it NOW" way:**
@@ -26,6 +40,7 @@ SingleCmdBlog is a ridiculously simple static blog generator that fits in a sing
 title: My First Post
 date: 2024-01-01
 categories: blog, thoughts
+
 ---
 
 This is easier than assembling IKEA furniture.
@@ -37,7 +52,7 @@ This is easier than assembling IKEA furniture.
 python3 build.py
 ```
 
-### 3. Serve it locally (because we live dangerously)
+### 3. Serve it locally
 
 ```bash
 python3 build.py --serve
