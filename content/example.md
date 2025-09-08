@@ -5,7 +5,7 @@ categories: Example
 min_read: 1
 author: barrentd
 date: 2025-08-27
-thumbnail: /assets/screen.jpg
+thumbnail: singlecmdblog/assets/screen.jpg
 thumbnail_on_article: true
 ---
 
@@ -19,6 +19,3 @@ Your markdown content here
 // Code example
 console.log("Hello, world!");
 ```
-
-
-
