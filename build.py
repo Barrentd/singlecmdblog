@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# TinyBlog Ultra (stdlib + optional python-markdown/pymdown-extensions)
+# singlecmdblog Ultra (stdlib + optional python-markdown/pymdown-extensions)
 # - Full Markdown when markdown/pymdownx present (fallback mini parser otherwise)
 # - Ordered posts (new→old), consistent sticky navbar (Home/About + category select)
 # - Day/Night theme toggle (persists via localStorage)
@@ -319,7 +319,7 @@ def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, pale
     <title>{html.escape(doc_title)}</title>
     {description_tag}
     <meta name=viewport content='width=device-width,initial-scale=1'>
-    <meta name=generator content=TinyBlog>
+    <meta name=generator content=singlecmdblog>
     {favicon_tag}
     <link rel=preconnect href=https://fonts.googleapis.com>
     <link rel=preconnect href=https://fonts.gstatic.com crossorigin>
@@ -367,7 +367,7 @@ def minify_html(s: str, enable_minify: bool = True) -> str:
 
 # ===================== Helpers =====================
 def read_site(site_path:Path)->dict:
-    return json.loads(site_path.read_text(encoding="utf-8")) if site_path.exists() else {"title":"TinyBlog","description":""}
+    return json.loads(site_path.read_text(encoding="utf-8")) if site_path.exists() else {"title":"singlecmdblog","description":""}
 
 def slugify(s:str)->str:
     s=s.lower(); s=re.sub(r"[^a-z0-9]+","-",s).strip("-"); return re.sub(r"-{2,}","-",s) or "uncategorized"
@@ -800,7 +800,7 @@ def build(args):
     out_dir=root/args.out
     site=read_site(root/args.site)
     site_description = site.get("description", "")
-    site_title = site.get("title", "TinyBlog")
+    site_title = site.get("title", "singlecmdblog")
     site_title_html = site.get("site_title", site_title)
     site_url = site.get("siteUrl", "")
     site_lang = site.get("lang", "en")

@@ -75,7 +75,7 @@ docker run -p 8080:80 singlecmdblog
 ## File Structure
 
 ```bash
-tinyblog/
+singlecmdblog/
 ├── build.py          # The magic happens here ✨
 ├── content/          # Your brilliant thoughts go here
 │   ├── hello.md      # Example post
@@ -123,7 +123,7 @@ Cats are basically tiny furry overlords...
 **Or use the Docker image** (because containers solve everything):
 
 ```bash
-docker run -p 80:80 tinyblog
+docker run -p 80:80 singlecmdblog
 ```
 
 ## Size Limits (because nobody likes slow sites)
