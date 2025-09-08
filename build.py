@@ -53,45 +53,101 @@ def _markdown_engine(debug: bool = False):
     if importlib.util.find_spec("markdown"):
         if debug:
             print("[DEBUG] Markdown engine = FULL")
-        import markdown  # type: ignore
+        try:
+            import markdown  # type: ignore
 
-        # No codehilite: highlighting is done by HLJS on the client
-        exts = ["extra", "sane_lists", "smarty", "toc", "admonition"]
-        for ext_name in (
-            "pymdownx.tasklist",
-            "pymdownx.tilde",
-            "pymdownx.caret",
-            "pymdownx.emoji",
-            "pymdownx.superfences",
-            "pymdownx.tabbed",  # tabs/onglets
-        ):
-            if importlib.util.find_spec(ext_name):
-                if debug:
-                    print(f"[DEBUG] Found extension: {ext_name}")
-                exts.append(ext_name)
+            # No codehilite: highlighting is done by HLJS on the client
+            exts = ["extra", "sane_lists", "smarty", "toc", "admonition"]
+            for ext_name in (
+                "pymdownx.tasklist",
+                "pymdownx.tilde",
+                "pymdownx.caret",
+                "pymdownx.emoji",
+                "pymdownx.superfences",
+                "pymdownx.tabbed",  # tabs/onglets
+            ):
+                if importlib.util.find_spec(ext_name):
+                    if debug:
+                        print(f"[DEBUG] Found extension: {ext_name}")
+                    exts.append(ext_name)
 
-        if debug:
-            print(f"[DEBUG] Extensions: {exts}")
-        md = markdown.Markdown(
-            extensions=exts,
-            extension_configs={
-                "pymdownx.tasklist": {"custom_checkbox": True, "clickable_checkbox": False},
-                # Safe: ignored if pymdownx.tabbed not loaded
-                "pymdownx.tabbed": {"alternate_style": True},
-            },
-            output_format="html",
-        )
-
-        def render_with_debug(text: str) -> str:
             if debug:
-                print(f"[DEBUG] Input markdown length: {len(text)}")
-            result = md.reset().convert(text)
-            if debug:
-                print(f"[DEBUG] Output HTML length: {len(result)}")
-                print(f"[DEBUG] First 200 chars of HTML: {result[:200]}")
-            return result
+                print(f"[DEBUG] Extensions: {exts}")
+            md = markdown.Markdown(
+                extensions=exts,
+                extension_configs={
+                    "pymdownx.tasklist": {"custom_checkbox": True, "clickable_checkbox": False},
+                    # Safe: ignored if pymdownx.tabbed not loaded
+                    "pymdownx.tabbed": {"alternate_style": True},
+                },
+                output_format="html",
+            )
 
-        return render_with_debug
+            def render_with_debug(text: str) -> str:
+                if not text:
+                    return ""
+                try:
+                    if debug:
+                        print(f"[DEBUG] Input markdown length: {len(text)}")
+                    result = md.reset().convert(text)
+                    if debug:
+                        print(f"[DEBUG] Output HTML length: {len(result)}")
+                        print(f"[DEBUG] First 200 chars of HTML: {result[:200]}")
+                    return result
+                except Exception as e:
+                    print(f"[ERROR] Markdown rendering failed: {e}")
+                    # Fallback to basic HTML escaping
+                    return f"<pre>{html.escape(text)}</pre>"
+
+            return render_with_debug
+            
+        except ImportError as e:
+            print(f"[WARN] Full markdown engine failed to load: {e}")
+    
+    # Fallback: basic markdown support
+    print("[WARN] Using basic markdown fallback - install 'markdown' and 'pymdown-extensions' for full features")
+    
+    def basic_render(text: str) -> str:
+        if not text:
+            return ""
+        
+        lines = text.split('\n')
+        result = []
+        in_code_block = False
+        
+        for line in lines:
+            if line.strip().startswith('```'):
+                if in_code_block:
+                    result.append('</pre>')
+                    in_code_block = False
+                else:
+                    result.append('<pre><code>')
+                    in_code_block = True
+                continue
+            
+            if in_code_block:
+                result.append(html.escape(line))
+                continue
+            
+            # Basic markdown processing
+            if line.startswith('#'):
+                level = len(line) - len(line.lstrip('#'))
+                if level <= 6:
+                    content = line[level:].strip()
+                    result.append(f'<h{level}>{html.escape(content)}</h{level}>')
+                    continue
+            
+            if line.strip():
+                result.append(f'<p>{html.escape(line)}</p>')
+            else:
+                result.append('')
+        
+        if in_code_block:
+            result.append('</code></pre>')
+        
+        return '\n'.join(result)
+    
+    return basic_render
 
 # You can control debug output by changing this flag
 DEBUG_MARKDOWN = False
@@ -147,7 +203,7 @@ THEME_BOOT_JS = (
 "})();"
 )
 
-# Updated nav/menu/theme script (toggle + switch de thème HLJS + GitLab-like code blocks)
+# Updated nav/menu/theme script (toggle + switch de thème HLJS + GitLab-like code blocks + accessibility)
 NAV_JS = (
 "(function(){const d=document,rt=d.documentElement;const KEY='tb-theme';"
 "function setHLJSTheme(t){var ln=d.getElementById('hljs-theme');"
@@ -160,7 +216,7 @@ NAV_JS = (
 " setHLJSTheme(rt.dataset.theme||'light');"
 " var b=d.getElementById('themeToggle');if(b){b.textContent=(rt.dataset.theme==='dark'?'☀️':'🌙');"
 " b.onclick=function(){var v=(rt.dataset.theme==='dark'?'light':'dark');apply(v);b.textContent=(v==='dark'?'☀️':'🌙');}}"
-" var m=d.getElementById('menuToggle');if(m){m.onclick=function(){rt.classList.toggle('menu-open');}}"
+" var m=d.getElementById('menuToggle');if(m){m.onclick=function(){var isOpen=rt.classList.toggle('menu-open');m.setAttribute('aria-expanded',isOpen?'true':'false');}}"
 " var sel=d.getElementById('categorySelect');if(sel){sel.onchange=function(){if(sel.value)location.href=sel.value;}}"
 " requestAnimationFrame(function(){rt.removeAttribute('data-tb-init');});"
 "}"
@@ -228,20 +284,20 @@ def build_nav(site_title:str, base_url:str, categories_sorted:list[tuple[str,str
     
     if categories_sorted:
         opts="".join(f'<option value="{base_url}category/{s}.html">{html.escape(n)}</option>' for n,s in categories_sorted)
-        select=(f'<select id="categorySelect" class="catselect" aria-label="Categories">'
+        select=(f'<select id="categorySelect" class="catselect" aria-label="Select a category to browse">'
                 f'<option value="">{html.escape("Categories")}</option>'
                 f'<option value="{base_url}index.html">All</option>{opts}</select>')
     else:
         select=""
     
-    return ('<div class="navbar"><div class="navwrap">'
+    return ('<nav class="navbar" role="navigation" aria-label="Main navigation"><div class="navwrap">'
             f'<a class="brand navlink" href="{base_url}index.html">{html.escape(site_title)}</a>'
             '<span class="spacer"></span>'
-            '<button id="menuToggle" class="btn" aria-label="Menu" title="Menu">☰</button>'
-            '<button id="themeToggle" class="btn" aria-label="Toggle theme" title="Toggle theme">🌙</button>'
+            '<button id="menuToggle" class="btn" aria-label="Toggle navigation menu" aria-expanded="false">☰</button>'
+            '<button id="themeToggle" class="btn" aria-label="Toggle dark/light theme">🌙</button>'
             '</div><div class="navwrap menu-panel">'
             f'{links}{select}{social_links_html}'
-            '</div></div>')
+            '</div></nav>')
 
 def build_presentation_section(presentation_config: dict, base_url: str) -> str:
     """Génère la section de présentation pour intégration dans le header"""
@@ -288,10 +344,11 @@ def minify_css(css: str) -> str:
     
     return css
 
-def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, palette_css:str, nav_html:str, favicon_url:str|None, theme_css_url:str|None, description:str|None=None, presentation_html:str="", page_h1:str="", lang:str="en")->str:
+def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, palette_css:str, nav_html:str, favicon_url:str|None, theme_css_url:str|None, description:str|None=None, presentation_html:str="", page_h1:str="", lang:str="en", rss_url:str|None=None)->str:
     favicon_tag = f'<link rel=icon href="{html.escape(favicon_url)}">' if favicon_url else ""
     theme_link = f'<link rel=stylesheet href="{html.escape(theme_css_url)}">' if theme_css_url else ""
     description_tag = f'<meta name=description content="{html.escape(description)}">' if description else ""
+    rss_tag = f'<link rel=alternate type="application/rss+xml" title="{html.escape(site_title)} RSS" href="{html.escape(rss_url)}">' if rss_url else ""
     
     h1_text = page_h1 if page_h1 else doc_title
     
@@ -311,8 +368,11 @@ def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, pale
     # PAS de minification du CSS non plus
     css_content = palette_css if palette_css else ""
     
-    # Template avec des retours à la ligne pour debug
-    return f"""<!doctype html>
+    # Improved footer with branding
+    footer_html = '<footer><small>Generated by <a href="https://github.com/Barrentd/singlecmdblog" target="_blank" rel="noopener">SingleCmdBlog</a></small></footer>'
+    
+    # Build the full HTML document
+    html_doc = f"""<!doctype html>
 <html lang='{html.escape(lang)}'>
 <head>
     <meta charset=utf-8>
@@ -321,6 +381,7 @@ def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, pale
     <meta name=viewport content='width=device-width,initial-scale=1'>
     <meta name=generator content=singlecmdblog>
     {favicon_tag}
+    {rss_tag}
     <link rel=preconnect href=https://fonts.googleapis.com>
     <link rel=preconnect href=https://fonts.gstatic.com crossorigin>
     <link href='https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Geist:wght@100..900&family=Ubuntu+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap' rel=stylesheet>
@@ -333,14 +394,16 @@ def render_page(doc_title:str, body_html:str, site_title:str, base_url:str, pale
     <main>
         <header>{header_content}</header>
         {body_html}
-        <footer></footer>
+        {footer_html}
     </main>
-    <script src=https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js></script>
-    <script>hljs.highlightAll();</script>
+    <script src=https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js onerror="console.warn('Could not load highlight.js from CDN')"></script>
+    <script>if(window.hljs)hljs.highlightAll();</script>
     <script>{HLJS_JS}</script>
     <script>{NAV_JS}</script>
 </body>
 </html>"""
+    
+    return html_doc
 
 def minify_html(s: str, enable_minify: bool = True) -> str:
     """Minifie le HTML en préservant le contenu sensible aux espaces"""
@@ -364,6 +427,42 @@ def minify_html(s: str, enable_minify: bool = True) -> str:
         s = s.replace(f"<!--__TB_KEEP_{i}__-->", blk)
     
     return s
+
+# ===================== Configuration validation =====================
+def validate_site_config(site_config: dict, site_path: Path) -> None:
+    """Valide la configuration du site et affiche des avertissements utiles"""
+    warnings = []
+    
+    # Vérifications essentielles
+    if not site_config.get("siteUrl"):
+        warnings.append("⚠️  Consider setting 'siteUrl' in site.json for RSS feed and sitemap generation")
+    
+    if not site_config.get("title"):
+        warnings.append("⚠️  Consider setting 'title' in site.json for better branding")
+    
+    if not site_config.get("description"):
+        warnings.append("⚠️  Consider setting 'description' in site.json for better SEO")
+    
+    # Vérifications d'optimisation
+    favicon = site_config.get("favicon")
+    if not favicon:
+        warnings.append("💡 Consider adding a 'favicon' in site.json (e.g., 'assets/favicon.ico')")
+    
+    # Vérifications de présentation
+    if site_config.get("presentation", {}).get("enabled") and not site_config["presentation"].get("photo"):
+        warnings.append("💡 Presentation is enabled but no 'photo' specified")
+    
+    # Vérifications des réseaux sociaux
+    social = site_config.get("social", {})
+    if social and not any(social.values()):
+        warnings.append("💡 Social links are configured but all URLs appear empty")
+    
+    # Afficher les avertissements
+    if warnings:
+        print(f"[INFO] Configuration suggestions for {site_path.name}:")
+        for warning in warnings:
+            print(f"       {warning}")
+        print()
 
 # ===================== Helpers =====================
 def read_site(site_path:Path)->dict:
@@ -491,15 +590,29 @@ def bytes_ok(path: Path, limit: int):
 class _MemHandler(BaseHTTPRequestHandler):
     pages:dict[str,str]={}
     public_dir:Path|None=None
+    xml_files:dict[str,str]={}  # For sitemap.xml, rss.xml, etc.
+    
     def do_GET(self):
         route=self.path
         if route=="/" or route.endswith("/"): route="/index.html"
         if route.startswith("//"): route=route[1:]
+        
+        # Serve HTML pages
         page=self.pages.get(route)
         if page is not None:
             self.send_response(200); self.send_header("content-type","text/html; charset=utf-8")
             self.send_header("cache-control","no-store, max-age=0"); self.end_headers()
             self.wfile.write(page.encode("utf-8")); return
+        
+        # Serve XML files (rss.xml, sitemap.xml)
+        xml_content = self.xml_files.get(route)
+        if xml_content is not None:
+            content_type = "application/xml" if route.endswith(".xml") else "text/plain"
+            self.send_response(200); self.send_header("content-type", f"{content_type}; charset=utf-8")
+            self.send_header("cache-control","no-store, max-age=0"); self.end_headers()
+            self.wfile.write(xml_content.encode("utf-8")); return
+            
+        # Serve static assets
         if route.startswith("/assets/") and self.public_dir:
             fs=(self.public_dir/route[len("/assets/"):]).resolve()
             if fs.is_file() and str(fs).startswith(str(self.public_dir.resolve())):
@@ -507,6 +620,8 @@ class _MemHandler(BaseHTTPRequestHandler):
                 self.send_response(200); self.send_header("content-type",ctype)
                 self.send_header("cache-control","no-store, max-age=0"); self.end_headers()
                 with fs.open("rb") as f: shutil.copyfileobj(f,self.wfile); return
+        
+        # 404 for everything else
         self.send_response(404); self.send_header("content-type","text/plain; charset=utf-8")
         self.end_headers(); self.wfile.write(b"404")
 
@@ -582,6 +697,67 @@ def generate_sitemap(site_url: str, posts: list, pages: dict, categories: dict, 
     xml_lines.append('</urlset>')
     
     return '\n'.join(xml_lines)
+
+# ===================== RSS Feed generation =====================
+def generate_rss_feed(site_config: dict, posts: list, base_url: str) -> str:
+    """Génère un flux RSS pour les articles du blog"""
+    from datetime import datetime
+    import html
+    
+    site_title = site_config.get("site_title", site_config.get("title", "Blog"))
+    site_url = site_config.get("siteUrl", "")
+    description = site_config.get("description", "")
+    site_lang = site_config.get("lang", "en")
+    
+    # Header RSS
+    rss_lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">',
+        '<channel>',
+        f'<title>{html.escape(site_title)}</title>',
+        f'<description>{html.escape(description)}</description>',
+        f'<link>{html.escape(site_url.rstrip("/") + base_url.rstrip("/"))}/</link>',
+        f'<language>{html.escape(site_lang)}</language>',
+        f'<lastBuildDate>{datetime.now().strftime("%a, %d %b %Y %H:%M:%S %z")}</lastBuildDate>',
+        f'<atom:link href="{html.escape(site_url.rstrip("/") + base_url.rstrip("/"))}/rss.xml" rel="self" type="application/rss+xml"/>',
+        '<generator>SingleCmdBlog</generator>'
+    ]
+    
+    # Ajouter les articles (limiter aux 20 plus récents)
+    recent_posts = posts[:20] if len(posts) > 20 else posts
+    
+    for post in recent_posts:
+        post_url = f'{site_url.rstrip("/")}{base_url.rstrip("/")}/{post["slug"]}.html'
+        pub_date = post["date_obj"].strftime("%a, %d %b %Y %H:%M:%S %z")
+        
+        # Créer un extrait HTML simple pour le contenu
+        content_excerpt = html.escape(post.get("excerpt", ""))
+        if len(content_excerpt) > 500:
+            content_excerpt = content_excerpt[:500] + "..."
+        
+        categories_xml = ""
+        if post.get("categories"):
+            categories_xml = "".join(f'<category>{html.escape(cat)}</category>' 
+                                   for cat in post["categories"])
+        
+        rss_lines.extend([
+            '<item>',
+            f'<title>{html.escape(post["title"])}</title>',
+            f'<link>{html.escape(post_url)}</link>',
+            f'<guid>{html.escape(post_url)}</guid>',
+            f'<pubDate>{pub_date}</pubDate>',
+            f'<description>{content_excerpt}</description>',
+            categories_xml,
+        ])
+        
+        if post.get("author"):
+            # Format: email (name) - but we only have name, so use generic format
+            rss_lines.append(f'<author>noreply@example.com ({html.escape(post["author"])})</author>')
+        
+        rss_lines.append('</item>')
+    
+    rss_lines.extend(['</channel>', '</rss>'])
+    return '\n'.join(rss_lines)
 
 # ===================== Robots.txt generation =====================
 def generate_robots_txt(robots_config: dict, site_url: str, base_url: str) -> str:
@@ -799,6 +975,9 @@ def build(args):
     public_dir=root/args.public
     out_dir=root/args.out
     site=read_site(root/args.site)
+    # Valider la configuration
+    validate_site_config(site, root/args.site)
+    
     site_description = site.get("description", "")
     site_title = site.get("title", "singlecmdblog")
     site_title_html = site.get("site_title", site_title)
@@ -872,6 +1051,9 @@ def build(args):
 
     nav_html=build_nav(site_title, args.base_url, categories_sorted, pages, social_links_html)
     
+    # RSS URL for HTML head links
+    rss_url = f"{args.base_url.rstrip('/')}/rss.xml" if site_url and posts else None
+    
     rendered={}
     
     # index
@@ -888,7 +1070,8 @@ def build(args):
         site_description,
         presentation_html,
         site_title,
-        lang=site_lang
+        lang=site_lang,
+        rss_url=rss_url
     ))
 
     # pages
@@ -907,7 +1090,8 @@ def build(args):
             site_description,
             "",
             page_title_h1,
-            lang=site_lang
+            lang=site_lang,
+            rss_url=rss_url
         ))
 
     # posts
@@ -946,7 +1130,8 @@ def build(args):
             site_description,
             "",
             post_title_h1,
-            lang=site_lang
+            lang=site_lang,
+            rss_url=rss_url
         ))
 
     # categories
@@ -966,12 +1151,55 @@ def build(args):
             theme_css_url, 
             site_description,
             "",
-            category_title_h1
+            category_title_h1,
+            rss_url=rss_url
         ))
+
+    # 404 error page
+    error_404_body = """
+    <div style="text-align: center; padding: 4rem 2rem;">
+        <h1>404 - Page Not Found</h1>
+        <p>The page you're looking for doesn't exist.</p>
+        <p><a href="{base_url}index.html" class="chip">← Return to Home</a></p>
+    </div>
+    """.format(base_url=args.base_url)
+    
+    rendered["/404.html"] = minify_html(render_page(
+        f"Page Not Found - {site_title_html}",
+        error_404_body,
+        site_title,
+        args.base_url,
+        pal_css,
+        nav_html,
+        favicon_url,
+        theme_css_url,
+        "Page not found",
+        "",
+        "Page Not Found",
+        lang=site_lang,
+        rss_url=rss_url
+    ))
 
     if args.serve:
         _MemHandler.pages=rendered
         _MemHandler.public_dir=public_dir if public_dir.exists() else None
+        
+        # Add XML files for dev server
+        xml_files = {}
+        if site_url:
+            sitemap_xml = generate_sitemap(site_url, posts, pages, cat_map, args.base_url)
+            xml_files["/sitemap.xml"] = sitemap_xml
+            
+            if posts:
+                rss_xml = generate_rss_feed(site, posts, args.base_url)
+                xml_files["/rss.xml"] = rss_xml
+        
+        robots_config = site.get("robotsTxt", {})
+        robots_txt = generate_robots_txt(robots_config, site_url, args.base_url)
+        xml_files["/robots.txt"] = robots_txt
+        
+        _MemHandler.xml_files = xml_files
+        
         srv=HTTPServer((args.host,args.port),_MemHandler)
         print(f"[SERVE] http://{args.host}:{args.port}  (HTML from memory; static from {public_dir}/ at /assets/)")
         try: srv.serve_forever()
@@ -1027,6 +1255,18 @@ def build(args):
         print(f"[OK] sitemap.xml generated with {len(posts) + len(pages) + len(cat_map) + 1} URLs")
     else:
         print("[SKIP] sitemap.xml - no siteUrl defined in site.json")
+    
+    # Génération du flux RSS
+    if site_url and posts:
+        rss_xml = generate_rss_feed(site, posts, args.base_url)
+        rss_file = out_dir / "rss.xml"
+        rss_file.write_text(rss_xml, encoding="utf-8")
+        print(f"[OK] rss.xml generated with {len(posts[:20])} recent posts")
+    else:
+        if not site_url:
+            print("[SKIP] rss.xml - no siteUrl defined in site.json")
+        else:
+            print("[SKIP] rss.xml - no posts to include")
     
     # Génération du robots.txt
     robots_config = site.get("robotsTxt", {})

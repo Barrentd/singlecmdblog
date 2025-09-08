@@ -14,6 +14,11 @@ SingleCmdBlog is a ridiculously simple static blog generator that fits in a sing
 - Mobile-friendly (your mom can read it on her phone)
 - Fast as lightning (14KB page limit enforced!)
 - Zero dependencies (well, Python... but that's it!)
+- **RSS feed generation** for blog syndication
+- **SEO optimized** with sitemap.xml and robots.txt
+- **404 error page** for professional error handling
+- **WebP image conversion** for better performance
+- **Accessibility friendly** with proper ARIA labels
 
 ## Live Demo
 
@@ -81,7 +86,12 @@ singlecmdblog/
 │   ├── hello.md      # Example post
 │   └── about.md      # Tell the world who you are
 ├── public/           # Static files (images, etc.)
+├── site.json         # Site configuration (title, social links, etc.)
 └── build/            # Generated site (don't touch, it bites)
+    ├── index.html    # Your beautiful blog
+    ├── rss.xml       # RSS feed for subscribers
+    ├── sitemap.xml   # For search engines
+    └── robots.txt    # SEO configuration
 ```
 
 ## Writing Posts
@@ -107,6 +117,29 @@ Cats are basically tiny furry overlords...
 - Pages: add `page: true` to front matter for non-blog pages
 
 ## Customization
+
+### Site Configuration (site.json)
+
+Configure your blog by editing `site.json`:
+
+```json
+{
+  "title": "My Blog",
+  "site_title": "My Awesome Blog", 
+  "siteUrl": "https://yourdomain.com",
+  "description": "My blog about awesome things",
+  "lang": "en",
+  "favicon": "assets/favicon.ico",
+  "social": {
+    "github": "https://github.com/yourusername",
+    "twitter": "https://twitter.com/yourusername"
+  }
+}
+```
+
+**Important:** Set `siteUrl` to enable RSS feed and sitemap generation!
+
+### Styling
 
 - **Site config:** Edit the variables at the top of `build.py`
 - **Theme:** CSS is embedded (because external files are overrated)
