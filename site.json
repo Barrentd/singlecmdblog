@@ -27,6 +27,6 @@
   "webp": {
     "enabled": true,
     "quality": 85,
-    "keepOriginals": false
+    "keepOriginals": true
   }
 }
