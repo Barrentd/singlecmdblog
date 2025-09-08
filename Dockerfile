@@ -10,17 +10,8 @@ WORKDIR /app
 COPY ./requirements.txt ./requirements.txt
 RUN python3 -m pip install -r requirements.txt
 
-# Copier les fichiers du projet
-COPY ./content ./content
-COPY ./public ./public
-COPY ./build.py ./build.py
-COPY ./site.json ./site.json
-
-# Builder le site
-RUN python3 build.py
-
 # Copier la configuration nginx
-COPY nginx.conf /etc/nginx/http.d/tinyblog.conf
+COPY ./nginx/nginx.conf /etc/nginx/http.d/singlecmdblog.conf
 
 # Supprimer la config par défaut d'Alpine
 RUN rm -f /etc/nginx/http.d/default.conf
@@ -31,6 +22,15 @@ RUN mkdir -p /var/log/nginx /var/lib/nginx/tmp && \
 
 # Utilisateur non-root
 USER nginx
+
+# Copier les fichiers du projet
+COPY ./content ./content
+COPY ./public ./public
+COPY ./build.py ./build.py
+COPY ./site.json ./site.json
+
+# Builder le site
+RUN python3 build.py
 
 # Exposer le port
 EXPOSE 80

@@ -31,13 +31,6 @@ def hello_world():
     print("Hello from a static page!")
 ```
 
-### Links and Navigation
-
-You can link to other pages and posts just like in regular Markdown:
-
-- [Back to Home](/singlecmdblog/)
-- [Example Article](/singlecmdblog/example.html)
-
 ## Perfect For
 
 - About pages
